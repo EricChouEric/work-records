@@ -57,12 +57,16 @@ function reportsSheet()    { return getMaster().getSheetByName('Reports'); }
 // Run once from GAS editor to initialise missing sheets
 function setupSheets() {
   const ss = getMaster();
+  console.log('操作的試算表：' + ss.getUrl());
   function ensure(name, headers) {
     let ws = ss.getSheetByName(name);
     if (!ws) {
       ws = ss.insertSheet(name);
       ws.appendRow(headers);
       ws.setFrozenRows(1);
+      console.log('已建立分頁：' + name);
+    } else {
+      console.log('分頁已存在：' + name);
     }
     return ws;
   }
@@ -70,6 +74,25 @@ function setupSheets() {
   ensure('Sessions',   ['token', 'userId', 'expiry']);
   ensure('WorkOrders', ['工單號碼', '船號', '建立時間', '備註']);
   ensure('Reports',    ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號']);
+  console.log('setupSheets 完成');
+}
+
+// 用來確認 MASTER_SHEET_ID 是否設定正確
+function debugConfig() {
+  const id = PropertiesService.getScriptProperties().getProperty('MASTER_SHEET_ID');
+  console.log('MASTER_SHEET_ID = ' + id);
+  if (!id) {
+    console.log('❌ 未設定！請到指令碼屬性新增 MASTER_SHEET_ID');
+    return;
+  }
+  try {
+    const ss = SpreadsheetApp.openById(id);
+    console.log('✅ 成功開啟試算表：' + ss.getName());
+    console.log('網址：' + ss.getUrl());
+    console.log('現有分頁：' + ss.getSheets().map(s => s.getName()).join(', '));
+  } catch (e) {
+    console.log('❌ 無法開啟試算表：' + e.message);
+  }
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
