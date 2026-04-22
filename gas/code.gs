@@ -11,6 +11,7 @@
 // Run setupSheets() once from the GAS editor to create missing tabs.
 
 function doGet(e) {
+  if (!e || !e.parameter) return jsonResponse({ status: 'error', message: '請透過 Web App URL 呼叫此 API' });
   const action = e.parameter.action;
   try {
     switch (action) {

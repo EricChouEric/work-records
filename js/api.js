@@ -1,5 +1,5 @@
 // ── 部署後請將此 URL 改為您的 Google Apps Script Web App URL ──────────────────
-const API_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzK3Q7l68dNQuvQoUECs53JP5mM-NPgQgWxpDmiiXeUxUubiK_LCPaMVEnmVJ8UKMir/exec';
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function hashPassword(password) {
