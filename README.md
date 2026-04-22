@@ -95,13 +95,27 @@ git push -u origin main
 
 ### 第五步：部署到 Cloudflare Pages
 
-1. 前往 [Cloudflare Dashboard](https://dash.cloudflare.com)，登入帳號
-2. 左側選單 **Workers & Pages** → **Create** → **Pages**
-3. 點選「**Connect to Git**」，選擇剛才建立的 private repo
-4. Build settings 全部**留空**
-5. 點選「**Save and Deploy**」，完成後取得 `https://xxx.pages.dev` 網址
+1. 前往 [Cloudflare Dashboard](https://dash.cloudflare.com)，登入或註冊免費帳號
+2. 左側選單點選「**Pages**」
+3. 點選「**Create a project**」→「**Connect to Git**」
+4. 點選「**Continue with GitHub**」，授權 Cloudflare 存取 GitHub
+5. 選擇第四步建立的 repository
+6. 進入「**Set up builds and deployments**」設定頁，填入如下：
 
-> 之後每次 `git push` 到 `main`，Cloudflare 會自動重新部署。
+   | 欄位 | 值 |
+   |------|---|
+   | Framework preset | None |
+   | Build command | **（空白）** |
+   | Build output directory | **（空白）** |
+   | Root directory | **（空白）** |
+
+7. 點選「**Save and Deploy**」
+8. 出現「**Success! Your project is deployed to Region: Earth**」即完成
+9. 網址格式為 `https://your-project-name.pages.dev`
+
+> ⚠️ 注意：步驟 3 要選「**Pages**」，不要選「Workers」，兩者介面相似但 Workers 需要額外的 deploy command 設定。
+
+> 之後每次 `git push` 到 `main`，Cloudflare 會自動重新部署，無需手動操作。
 
 ---
 
