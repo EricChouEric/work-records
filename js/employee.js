@@ -106,16 +106,41 @@ function getSubmitValues() {
   const shipSel = document.getElementById('shipSelect');
 
   if (shipSel.value === '__manual__') {
-    const shipNo    = document.getElementById('shipManual').value.trim();
-    const workOrder = document.getElementById('workOrderManual').value.trim();
-    return { shipNo, workOrders: workOrder ? workOrder : '' };
+    const shipNo = document.getElementById('shipManual').value.trim();
+    const orders = [...document.querySelectorAll('.manual-wo-input')]
+      .map(el => el.value.trim()).filter(Boolean);
+    return { shipNo, workOrders: orders.join(',') };
   }
 
-  const shipNo   = shipSel.value;
-  const checked  = [...document.querySelectorAll('.wo-check:checked')].map(c => c.value);
-  const extra    = document.getElementById('extraWo').value.trim();
-  if (extra) checked.push(extra);
-  return { shipNo, workOrders: checked.join(',') };
+  const shipNo  = shipSel.value;
+  const checked = [...document.querySelectorAll('.wo-check:checked')].map(c => c.value);
+  const extras  = [...document.querySelectorAll('.extra-wo-input')]
+    .map(el => el.value.trim()).filter(Boolean);
+  return { shipNo, workOrders: [...checked, ...extras].join(',') };
+}
+
+function addManualWoField() {
+  const list = document.getElementById('manualWoList');
+  const row  = document.createElement('div');
+  row.className = 'manual-wo-row';
+  row.innerHTML = `<input type="text" class="manual-wo-input" placeholder="請輸入工單號碼">
+    <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>`;
+  list.appendChild(row);
+}
+
+function addExtraWoField() {
+  const list = document.getElementById('extraWoList');
+  const row  = document.createElement('div');
+  row.className = 'manual-wo-row';
+  row.innerHTML = `<input type="text" class="extra-wo-input" placeholder="臨時工單號碼">
+    <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>`;
+  list.appendChild(row);
+}
+
+function resetManualLists() {
+  document.getElementById('manualWoList').innerHTML =
+    '<div class="manual-wo-row"><input type="text" class="manual-wo-input" placeholder="請輸入工單號碼"></div>';
+  document.getElementById('extraWoList').innerHTML = '';
 }
 
 async function handleSubmit(e) {
@@ -151,12 +176,13 @@ async function handleSubmit(e) {
 
     if (result.status === 'success') {
       msgEl.className   = 'msg msg-success';
-      msgEl.textContent = '報工已儲存';
+      msgEl.textContent = result.message || '報工已儲存';
       e.target.reset();
       document.getElementById('date').valueAsDate = new Date();
-      document.getElementById('shipManualGroup').style.display  = 'none';
-      document.getElementById('workOrderSection').style.display = 'none';
+      document.getElementById('shipManualGroup').style.display       = 'none';
+      document.getElementById('workOrderSection').style.display      = 'none';
       document.getElementById('workOrderManualSection').style.display = 'none';
+      resetManualLists();
       await loadRecords();
     } else {
       if (result.message.includes('逾時')) return doLogout();

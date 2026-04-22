@@ -479,6 +479,43 @@ tfoot td {
   cursor: pointer;
 }
 
+/* ── Manual work order list ──────────────────── */
+
+.extra-label {
+  font-size: .8rem;
+  color: var(--text-muted);
+  margin-bottom: .3rem;
+}
+
+.manual-wo-row {
+  display: flex;
+  gap: .4rem;
+  margin-bottom: .35rem;
+  align-items: center;
+}
+
+.manual-wo-row input {
+  flex: 1;
+}
+
+.btn-remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #FEF2F2;
+  color: #DC2626;
+  font-size: .8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-remove:hover { background: #FEE2E2; }
+
 /* ── Import example hint ─────────────────────── */
 
 .import-example {

@@ -57,13 +57,20 @@
             <label>工單號碼（可多選）</label>
             <div id="workOrderCheckboxes" class="checkbox-list"></div>
             <div id="extraWoGroup" style="margin-top:.5rem">
-              <input type="text" id="extraWo" placeholder="手動新增臨時工單號碼（選填）" class="inline-input" style="width:100%">
+              <div class="extra-label">手動新增臨時工單（選填）</div>
+              <div id="extraWoList"></div>
+              <button type="button" class="btn btn-outline btn-sm" style="margin-top:.35rem" onclick="addExtraWoField()">＋ 新增臨時工單</button>
             </div>
           </div>
           <!-- 純手動模式（船號手動輸入時） -->
           <div class="form-group" id="workOrderManualSection" style="display:none">
-            <label for="workOrderManual">工單號碼</label>
-            <input type="text" id="workOrderManual" placeholder="請輸入工單號碼">
+            <label>工單號碼（可多筆）</label>
+            <div id="manualWoList">
+              <div class="manual-wo-row">
+                <input type="text" class="manual-wo-input" placeholder="請輸入工單號碼">
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" style="margin-top:.35rem" onclick="addManualWoField()">＋ 新增工單</button>
           </div>
 
           <div id="reportMsg" class="msg hidden"></div>

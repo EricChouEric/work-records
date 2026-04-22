@@ -193,17 +193,15 @@ function submitReport(p) {
   const user = findUser(userId);
   if (!user) return jsonResponse({ status: 'error', message: '找不到員工資料' });
 
-  // p.workOrders = comma-separated string of selected work order IDs
-  reportsSheet().appendRow([
-    new Date().toISOString(),
-    p.date,
-    user.id,
-    user.name,
-    user.group,
-    p.workOrders,
-    p.shipNo
-  ]);
-  return jsonResponse({ status: 'success', message: '報工已儲存' });
+  const orders = String(p.workOrders).split(',').map(s => s.trim()).filter(Boolean);
+  if (!orders.length) return jsonResponse({ status: 'error', message: '請至少填入一個工單號碼' });
+
+  const sheet = reportsSheet();
+  const now   = new Date().toISOString();
+  orders.forEach(order => {
+    sheet.appendRow([now, p.date, user.id, user.name, user.group, order, p.shipNo]);
+  });
+  return jsonResponse({ status: 'success', message: `報工已儲存（共 ${orders.length} 筆）` });
 }
 
 function getMyReports(p) {
