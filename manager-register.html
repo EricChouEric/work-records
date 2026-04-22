@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>主管帳號申請 - 報工系統</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>主管帳號申請</h1>
+      <p class="subtitle">需要管理員邀請碼才能建立主管帳號</p>
+
+      <form id="managerRegForm">
+        <div class="form-group">
+          <label for="empId">工號</label>
+          <input type="text" id="empId" placeholder="請輸入工號" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="name">姓名</label>
+          <input type="text" id="name" placeholder="請輸入姓名" required>
+        </div>
+        <div class="form-group">
+          <label for="password">密碼</label>
+          <input type="password" id="password" placeholder="請設定密碼（至少 6 個字元）" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="confirm">確認密碼</label>
+          <input type="password" id="confirm" placeholder="請再次輸入密碼" required autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="invite">邀請碼</label>
+          <input type="password" id="invite" placeholder="請輸入管理員邀請碼" required>
+        </div>
+        <div id="regMsg" class="msg hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">申請主管帳號</button>
+      </form>
+
+      <div class="auth-footer">
+        <a href="index.html">返回登入</a>
+        &nbsp;|&nbsp;
+        <a href="register.html">員工註冊</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById('managerRegForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn   = document.getElementById('submitBtn');
+      const msgEl = document.getElementById('regMsg');
+      const pwd   = document.getElementById('password').value;
+
+      if (pwd !== document.getElementById('confirm').value) {
+        msgEl.className   = 'msg msg-error';
+        msgEl.textContent = '兩次密碼輸入不一致';
+        return;
+      }
+
+      btn.disabled    = true;
+      btn.textContent = '處理中...';
+      msgEl.className = 'msg hidden';
+
+      try {
+        const id     = document.getElementById('empId').value.trim();
+        const name   = document.getElementById('name').value.trim();
+        const hash   = await hashPassword(pwd);
+        const invite = document.getElementById('invite').value.trim();
+        const r      = await callAPI({ action: 'registerManager', id, name, pwd: hash, invite });
+
+        if (r.status === 'success') {
+          msgEl.className   = 'msg msg-success';
+          msgEl.textContent = r.message + '  3 秒後跳轉至登入頁...';
+          setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+        } else {
+          msgEl.className   = 'msg msg-error';
+          msgEl.textContent = r.message;
+        }
+      } catch (err) {
+        msgEl.className   = 'msg msg-error';
+        msgEl.textContent = err.message || '連線失敗，請稍後再試';
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = '申請主管帳號';
+      }
+    });
+  </script>
+</body>
+</html>

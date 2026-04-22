@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>員工儀表板 - 派工系統</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav>
+    <span class="brand">派工系統</span>
+    <div class="user-info">
+      <span id="userGroup" class="nav-badge"></span>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">登出</button>
+    </div>
+  </nav>
+
+  <div class="main-content">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-panel="reportPanel">填寫報工</button>
+      <button class="tab-btn" data-panel="historyPanel">我的記錄</button>
+    </div>
+
+    <!-- Tab: 填寫報工 -->
+    <div id="reportPanel" class="tab-panel">
+      <div class="card">
+        <div class="card-title">新增派工記錄</div>
+
+        <div class="info-chips">
+          <span class="chip chip-blue">工號：<strong id="infoEmpId"></strong></span>
+          <span class="chip chip-green">組別：<strong id="infoGroup"></strong></span>
+        </div>
+
+        <form id="reportForm">
+          <div class="form-group">
+            <label for="date">施工日期</label>
+            <input type="date" id="date" required>
+          </div>
+
+          <!-- 步驟一：選船號 -->
+          <div class="form-group">
+            <label for="shipSelect">船號</label>
+            <select id="shipSelect">
+              <option value="">載入中...</option>
+            </select>
+          </div>
+          <div class="form-group" id="shipManualGroup" style="display:none">
+            <label for="shipManual">手動輸入船號（臨時）</label>
+            <input type="text" id="shipManual" placeholder="請輸入臨時船號">
+          </div>
+
+          <!-- 步驟二：選工單（依船號篩選，多選） -->
+          <div class="form-group" id="workOrderSection" style="display:none">
+            <label>工單號碼（可多選）</label>
+            <div id="workOrderCheckboxes" class="checkbox-list"></div>
+            <div id="extraWoGroup" style="margin-top:.5rem">
+              <input type="text" id="extraWo" placeholder="手動新增臨時工單號碼（選填）" class="inline-input" style="width:100%">
+            </div>
+          </div>
+          <!-- 純手動模式（船號手動輸入時） -->
+          <div class="form-group" id="workOrderManualSection" style="display:none">
+            <label for="workOrderManual">工單號碼</label>
+            <input type="text" id="workOrderManual" placeholder="請輸入工單號碼">
+          </div>
+
+          <div id="reportMsg" class="msg hidden"></div>
+          <button type="submit" class="btn btn-primary btn-full" id="submitBtn">送出報工</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tab: 我的記錄 -->
+    <div id="historyPanel" class="tab-panel hidden">
+      <div class="card">
+        <div class="filter-row">
+          <label>年份</label>
+          <input type="number" id="filterYear" min="2020" max="2099">
+          <label>月份</label>
+          <select id="filterMonth">
+            <option value="">全年</option>
+            <option value="01">1 月</option>
+            <option value="02">2 月</option>
+            <option value="03">3 月</option>
+            <option value="04">4 月</option>
+            <option value="05">5 月</option>
+            <option value="06">6 月</option>
+            <option value="07">7 月</option>
+            <option value="08">8 月</option>
+            <option value="09">9 月</option>
+            <option value="10">10 月</option>
+            <option value="11">11 月</option>
+            <option value="12">12 月</option>
+          </select>
+          <button class="btn btn-outline btn-sm" id="filterApply">查詢</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>施工日期</th>
+                <th>船號</th>
+                <th>工單號碼</th>
+                <th>組別</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody">
+              <tr><td colspan="4" class="loading">載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/employee.js"></script>
+</body>
+</html>

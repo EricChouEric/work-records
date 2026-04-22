@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>報工系統 - 登入</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>報工系統</h1>
+      <p class="subtitle">請輸入工號與密碼登入</p>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="empId">工號</label>
+          <input type="text" id="empId" placeholder="請輸入工號" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="password">密碼</label>
+          <input type="password" id="password" placeholder="請輸入密碼" required autocomplete="current-password">
+        </div>
+        <div id="loginMsg" class="msg hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="loginBtn">登入</button>
+      </form>
+
+      <div class="auth-footer">
+        <a href="register.html">員工註冊</a>
+        &nbsp;|&nbsp;
+        <a href="manager-register.html">主管帳號申請</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    const _t = localStorage.getItem('token');
+    if (_t) {
+      window.location.href = localStorage.getItem('role') === 'manager' ? 'manager.html' : 'employee.html';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn   = document.getElementById('loginBtn');
+      const msgEl = document.getElementById('loginMsg');
+      btn.disabled    = true;
+      btn.textContent = '登入中...';
+      msgEl.className = 'msg hidden';
+      try {
+        const id  = document.getElementById('empId').value.trim();
+        const pwd = await hashPassword(document.getElementById('password').value);
+        const r   = await callAPI({ action: 'login', id, pwd });
+        if (r.status === 'success') {
+          localStorage.setItem('token', r.token);
+          localStorage.setItem('role',  r.role);
+          localStorage.setItem('name',  r.name);
+          localStorage.setItem('empId', id);
+          localStorage.setItem('group', r.group || '');
+          window.location.href = r.role === 'manager' ? 'manager.html' : 'employee.html';
+        } else {
+          msgEl.className   = 'msg msg-error';
+          msgEl.textContent = r.message;
+        }
+      } catch (err) {
+        msgEl.className   = 'msg msg-error';
+        msgEl.textContent = err.message || '連線失敗，請稍後再試';
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = '登入';
+      }
+    });
+  </script>
+</body>
+</html>

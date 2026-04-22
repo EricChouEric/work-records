@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理者儀表板 - 派工系統</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav>
+    <span class="brand">派工系統（管理者）</span>
+    <div class="user-info">
+      <span id="userName"></span>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">登出</button>
+    </div>
+  </nav>
+
+  <div class="main-content">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-panel="workOrderPanel">工單管理</button>
+      <button class="tab-btn" data-panel="recordsPanel">派工記錄</button>
+      <button class="tab-btn" data-panel="statsPanel">統計分析</button>
+    </div>
+
+    <!-- ── Tab 1: 工單管理 ── -->
+    <div id="workOrderPanel" class="tab-panel">
+
+      <!-- 手動新增 -->
+      <div class="card">
+        <div class="card-title">新增工單</div>
+        <div class="inline-form">
+          <input type="text" id="newWoId" placeholder="工單號碼" class="inline-input">
+          <input type="text" id="newWoShip" placeholder="船號" class="inline-input">
+          <input type="text" id="newWoRemark" placeholder="備註（選填）" class="inline-input">
+          <button class="btn btn-primary btn-sm" onclick="addWorkOrder()">新增</button>
+        </div>
+        <div id="addWoMsg" class="msg hidden" style="margin-top:.75rem"></div>
+      </div>
+
+      <!-- 從 Google Sheet 匯入 -->
+      <div class="card">
+        <div class="card-title">從 Google Sheet 匯入工單</div>
+        <p class="helper-text">每個<strong>分頁名稱</strong>即為船號，<strong>A 欄</strong>填工單號碼（第 2 列起）。系統會自動讀取全部分頁。</p>
+        <div class="import-example">
+          <span>範例：分頁「海勝一號」→ A2: WO-001 / A3: WO-002 ...</span>
+        </div>
+        <div class="form-group" style="margin-top:.75rem">
+          <label>Google Sheet 網址</label>
+          <input type="text" id="importSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;gap:.75rem">
+          <div class="form-group">
+            <label>指定分頁（留空=全部分頁）</label>
+            <input type="text" id="importSheetName" placeholder="例：海勝一號">
+          </div>
+          <div class="form-group">
+            <label>工單號碼欄（欄位編號）</label>
+            <input type="number" id="importCol" value="1" min="1">
+          </div>
+          <div class="form-group">
+            <label>備註欄（留空=無）</label>
+            <input type="number" id="importRemarkCol" placeholder="例：2" min="1">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="importFromSheet()">從 Google Sheet 匯入</button>
+        <div id="importMsg" class="msg hidden" style="margin-top:.75rem"></div>
+      </div>
+
+      <!-- 工單清單 -->
+      <div class="card">
+        <div class="card-title">現有工單清單</div>
+        <div id="woListWrap"><div class="loading">載入中...</div></div>
+      </div>
+
+    </div><!-- /workOrderPanel -->
+
+    <!-- ── Tab 2: 派工記錄 ── -->
+    <div id="recordsPanel" class="tab-panel hidden">
+      <div class="card">
+        <div class="card-title">派工記錄查詢</div>
+        <div class="filter-grid">
+          <div class="filter-item">
+            <label>施工日期 起</label>
+            <input type="date" id="rStartDate">
+          </div>
+          <div class="filter-item">
+            <label>施工日期 迄</label>
+            <input type="date" id="rEndDate">
+          </div>
+          <div class="filter-item">
+            <label>組別</label>
+            <select id="rGroup"><option value="">全部</option></select>
+          </div>
+          <div class="filter-item">
+            <label>工號</label>
+            <select id="rEmpId"><option value="">全部</option></select>
+          </div>
+          <div class="filter-item">
+            <label>工單號碼</label>
+            <select id="rWorkOrder"><option value="">全部</option></select>
+          </div>
+          <div class="filter-item">
+            <label>船號</label>
+            <input type="text" id="rShipNo" placeholder="輸入船號篩選">
+          </div>
+          <div class="filter-item">
+            <label>排序方式</label>
+            <select id="rSortBy">
+              <option value="date">施工日期（最新）</option>
+              <option value="workOrder">工單號碼</option>
+              <option value="shipNo">船號</option>
+              <option value="group">組別</option>
+              <option value="empId">工號</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="rQueryBtn" onclick="loadRecords()" style="margin-top:.5rem">查詢</button>
+        <div id="recordsCount" class="helper-text" style="margin-top:.5rem"></div>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>施工日期</th>
+                <th>工號</th>
+                <th>組別</th>
+                <th>船號</th>
+                <th>工單號碼</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody">
+              <tr><td colspan="5" class="loading">請點擊查詢</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /recordsPanel -->
+
+    <!-- ── Tab 3: 統計分析 ── -->
+    <div id="statsPanel" class="tab-panel hidden">
+      <div class="card">
+        <div class="card-title">統計篩選</div>
+        <div class="filter-grid">
+          <div class="filter-item">
+            <label>施工日期 起</label>
+            <input type="date" id="sStartDate">
+          </div>
+          <div class="filter-item">
+            <label>施工日期 迄</label>
+            <input type="date" id="sEndDate">
+          </div>
+          <div class="filter-item">
+            <label>組別</label>
+            <select id="sGroup"><option value="">全部</option></select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadStats()" style="margin-top:.5rem">統計</button>
+      </div>
+
+      <div class="stats-three">
+        <div class="card">
+          <div class="card-title">依工單統計</div>
+          <div id="statsByWorkOrder"><div class="empty">請點擊統計</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">依船號統計</div>
+          <div id="statsByShip"><div class="empty">請點擊統計</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">依組別統計</div>
+          <div id="statsByGroup"><div class="empty">請點擊統計</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">依員工統計</div>
+          <div id="statsByEmp"><div class="empty">請點擊統計</div></div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="card">
+        <div class="card-title">時間軸（每日派工筆數）</div>
+        <div id="statsTimeline"><div class="empty">請點擊統計</div></div>
+      </div>
+    </div><!-- /statsPanel -->
+
+  </div><!-- /main-content -->
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/manager.js"></script>
+</body>
+</html>
