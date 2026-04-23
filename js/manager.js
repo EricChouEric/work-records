@@ -10,7 +10,7 @@ async function init() {
   document.getElementById('userName').textContent = session.name;
 
   setupTabs();
-  await Promise.all([loadEmployeeFilters(), loadWorkOrderList()]);
+  await Promise.all([loadEmployeeFilters(), loadWorkOrderList(), loadGroups()]);
 }
 
 function setupTabs() {
@@ -143,6 +143,73 @@ async function importFromSheet() {
   }
 }
 
+// ── Group Management ─────────────────────────────────────────────────────────
+
+async function loadGroups() {
+  const wrap = document.getElementById('groupListWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="loading">載入中...</div>';
+  try {
+    const result = await callAPI({ action: 'getGroups' });
+    if (result.status !== 'success') {
+      wrap.innerHTML = `<div class="empty">${result.message}</div>`;
+      return;
+    }
+    const groups = result.groups || [];
+    if (!groups.length) {
+      wrap.innerHTML = '<div class="empty">尚無組別，請先匯入</div>';
+      return;
+    }
+    wrap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>組別</th></tr></thead>
+          <tbody>
+            ${groups.map((g, i) => `
+              <tr>
+                <td style="color:var(--text-muted)">${i + 1}</td>
+                <td><span class="badge badge-green">${escHtml(g)}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="empty">載入失敗</div>';
+  }
+}
+
+async function importGroupsFromSheet() {
+  const sheetUrl  = extractSpreadsheetId(document.getElementById('importGroupSheetUrl').value);
+  const sheetName = document.getElementById('importGroupSheetName').value.trim();
+  const col       = document.getElementById('importGroupCol').value;
+  const msgEl     = document.getElementById('importGroupMsg');
+
+  if (!sheetUrl) { showMsg(msgEl, 'error', '請輸入 Google Sheet 網址'); return; }
+
+  const btn = document.querySelector('[onclick="importGroupsFromSheet()"]');
+  btn.disabled = true;
+  btn.textContent = '匯入中...';
+  showMsg(msgEl, '', '');
+
+  try {
+    const params = { action: 'importGroups', token: session.token, sheetUrl, col };
+    if (sheetName) params.sheetName = sheetName;
+    const result = await callAPI(params);
+    if (result.status === 'success') {
+      showMsg(msgEl, 'success', result.message);
+      await loadGroups();
+      await loadEmployeeFilters();
+    } else {
+      showMsg(msgEl, 'error', result.message);
+    }
+  } catch (e) {
+    showMsg(msgEl, 'error', `連線失敗：${e.message || e}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '匯入組別';
+  }
+}
+
 // ── Records ──────────────────────────────────────────────────────────────────
 
 async function loadEmployeeFilters() {
@@ -154,10 +221,12 @@ async function loadEmployeeFilters() {
 
     ['rGroup', 'sGroup'].forEach(id => {
       const sel = document.getElementById(id);
+      while (sel.options.length > 1) sel.remove(1);
       allGroups.forEach(g => sel.appendChild(new Option(g, g)));
     });
 
     const empSel = document.getElementById('rEmpId');
+    while (empSel.options.length > 1) empSel.remove(1);
     allEmployees.forEach(emp => {
       empSel.appendChild(new Option(`${emp.id} ${emp.name}`, emp.id));
     });
