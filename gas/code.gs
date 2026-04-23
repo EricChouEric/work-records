@@ -65,12 +65,21 @@ function formatTextColumns(ws, cols) {
   cols.forEach(col => ws.getRange(1, col, maxRows, 1).setNumberFormat('@'));
 }
 
+function formatCodeColumns(ws, cols) {
+  if (!ws || !cols.length) return;
+  const maxRows = Math.max(ws.getMaxRows(), 1);
+  if (maxRows < 2) return;
+  cols.forEach(col => ws.getRange(2, col, maxRows - 1, 1).setNumberFormat('000'));
+}
+
 function formatIdentifierColumns() {
   formatTextColumns(usersSheet(),      [1, 2, 3, 4, 5]);
   formatTextColumns(groupsSheet(),     [1, 2]);
   formatTextColumns(sessionsSheet(),   [1, 2]);
-  formatTextColumns(workOrdersSheet(), [1, 2, 3, 4]);
-  formatTextColumns(reportsSheet(),    [1, 2, 3, 4, 5, 6, 7]);
+  formatCodeColumns(workOrdersSheet(), [1, 2]);
+  formatTextColumns(workOrdersSheet(), [3, 4]);
+  formatCodeColumns(reportsSheet(),    [6, 7]);
+  formatTextColumns(reportsSheet(),    [1, 2, 3, 4, 5]);
 }
 
 function appendTextRow(ws, values, textCols) {
@@ -133,7 +142,6 @@ function debugConfig() {
 function repairWorkOrderCodes() {
   const ws = workOrdersSheet();
   if (!ws) throw new Error('找不到 WorkOrders 分頁');
-  formatTextColumns(ws, [1, 2, 3, 4]);
 
   const lastRow = ws.getLastRow();
   if (lastRow < 2) {
@@ -143,14 +151,39 @@ function repairWorkOrderCodes() {
 
   const range = ws.getRange(2, 1, lastRow - 1, 4);
   const rows = range.getDisplayValues().map(row => [
-    normalizeWorkOrderId(row[0]),
-    normalizeShipNo(row[1]),
+    sheetCodeValue(normalizeWorkOrderId(row[0])),
+    sheetCodeValue(normalizeShipNo(row[1])),
     String(row[2] || ''),
     String(row[3] || '')
   ]);
-  range.setNumberFormat('@');
+  ws.getRange(2, 1, lastRow - 1, 2).clearFormat();
+  ws.getRange(2, 1, lastRow - 1, 2).setNumberFormat('000');
+  ws.getRange(2, 3, lastRow - 1, 2).setNumberFormat('@');
   range.setValues(rows);
   console.log(`repairWorkOrderCodes 完成，共修復 ${rows.length} 筆`);
+}
+
+function forceRepairWorkOrderCodes() {
+  const ws = workOrdersSheet();
+  if (!ws) throw new Error('找不到 WorkOrders 分頁');
+  const lastRow = ws.getLastRow();
+  if (lastRow < 2) return;
+
+  const codeRange = ws.getRange(2, 1, lastRow - 1, 2);
+  const otherRange = ws.getRange(2, 3, lastRow - 1, 2);
+  const codeRows = codeRange.getDisplayValues().map(row => [
+    /^\d+$/.test(String(row[0]).trim()) ? Number(String(row[0]).trim()) : String(row[0]).trim(),
+    /^\d+$/.test(String(row[1]).trim()) ? Number(String(row[1]).trim()) : String(row[1]).trim()
+  ]);
+
+  codeRange.clearFormat();
+  otherRange.clearFormat();
+  codeRange.setNumberFormat('000');
+  otherRange.setNumberFormat('@');
+  codeRange.setValues(codeRows);
+
+  const preview = codeRange.getDisplayValues().slice(0, 5).map(r => r.join('/')).join(', ');
+  console.log(`forceRepairWorkOrderCodes 完成，共修復 ${codeRows.length} 筆。前 5 筆：${preview}`);
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -175,6 +208,16 @@ function normalizeWorkOrderId(val) {
 function normalizeThreeDigitCode(val) {
   const text = String(val || '').trim();
   return /^\d{1,2}$/.test(text) ? text.padStart(3, '0') : text;
+}
+
+function sheetText(val) {
+  const text = String(val || '').trim();
+  return text ? "'" + text : '';
+}
+
+function sheetCodeValue(val) {
+  const text = String(val || '').trim();
+  return /^\d+$/.test(text) ? Number(text) : text;
 }
 
 function extractSpreadsheetId(input) {
@@ -299,7 +342,18 @@ function submitReport(p) {
   const now   = new Date().toISOString();
   const shipNo = normalizeShipNo(p.shipNo);
   orders.forEach(order => {
-    appendTextRow(sheet, [now, String(p.date), user.id, user.name, user.group, normalizeWorkOrderId(order), shipNo], [1, 2, 3, 4, 5, 6, 7]);
+    const row = sheet.getLastRow() + 1;
+    sheet.getRange(row, 1, 1, 5).setNumberFormat('@');
+    sheet.getRange(row, 6, 1, 2).setNumberFormat('000');
+    sheet.getRange(row, 1, 1, 7).setValues([[
+      now,
+      String(p.date),
+      user.id,
+      user.name,
+      user.group,
+      sheetCodeValue(normalizeWorkOrderId(order)),
+      sheetCodeValue(shipNo)
+    ]]);
   });
   return jsonResponse({ status: 'success', message: `報工已儲存（共 ${orders.length} 筆）` });
 }
@@ -372,7 +426,10 @@ function addWorkOrder(p) {
       return jsonResponse({ status: 'error', message: '工單號碼已存在' });
   }
   // [工單號碼, 船號, 建立時間, 備註]
-  appendTextRow(ws, [workOrderId, shipNo, new Date().toISOString(), String(p.remark || '')], [1, 2, 3, 4]);
+  const row = ws.getLastRow() + 1;
+  ws.getRange(row, 1, 1, 2).setNumberFormat('000');
+  ws.getRange(row, 3, 1, 2).setNumberFormat('@');
+  ws.getRange(row, 1, 1, 4).setValues([[sheetCodeValue(workOrderId), sheetCodeValue(shipNo), new Date().toISOString(), String(p.remark || '')]]);
   return jsonResponse({ status: 'success', message: '工單已新增' });
 }
 
@@ -422,7 +479,10 @@ function importWorkOrders(p) {
     if (!id) continue;
     if (existSet.has(id)) { skipped++; continue; }
     // [工單號碼, 船號, 建立時間, 備註]
-    appendTextRow(ws, [id, shipNo, now, remark], [1, 2, 3, 4]);
+    const row = ws.getLastRow() + 1;
+    ws.getRange(row, 1, 1, 2).setNumberFormat('000');
+    ws.getRange(row, 3, 1, 2).setNumberFormat('@');
+    ws.getRange(row, 1, 1, 4).setValues([[sheetCodeValue(id), sheetCodeValue(shipNo), now, remark]]);
     existSet.add(id);
     added++;
   }
@@ -468,7 +528,7 @@ function importGroups(p) {
       const group = String(data[i][col] || '').trim();
       if (!group) continue;
       if (existSet.has(group)) { skipped++; continue; }
-      rowsToAppend.push([group, now]);
+      rowsToAppend.push([sheetText(group), now]);
       existSet.add(group);
     }
   }
@@ -562,11 +622,16 @@ function importFromSheet(p) {
       if (existSet.has(id)) { skipped++; continue; }
       const remark = remarkCol >= 0 ? String(data[i][remarkCol] || '') : '';
       // [工單號碼, 船號, 建立時間, 備註]
-      rowsToAppend.push([id, shipNo, now, remark]);
+      rowsToAppend.push([sheetCodeValue(id), sheetCodeValue(shipNo), now, remark]);
       existSet.add(id);
     }
   }
-  appendTextRows(targetWs, rowsToAppend, [1, 2, 3, 4]);
+  if (rowsToAppend.length) {
+    const appendStartRow = targetWs.getLastRow() + 1;
+    targetWs.getRange(appendStartRow, 1, rowsToAppend.length, 2).setNumberFormat('000');
+    targetWs.getRange(appendStartRow, 3, rowsToAppend.length, 2).setNumberFormat('@');
+    targetWs.getRange(appendStartRow, 1, rowsToAppend.length, 4).setValues(rowsToAppend);
+  }
   const added = rowsToAppend.length;
   return jsonResponse({ status: 'success', message: `匯入完成：新增 ${added} 筆，略過重複 ${skipped} 筆` });
 }
