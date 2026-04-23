@@ -39,17 +39,24 @@ function setupTabs() {
 
 async function loadWorkOrders() {
   const shipSel = document.getElementById('shipSelect');
+  const msgEl = document.getElementById('reportMsg');
   try {
     const result = await callAPI({ action: 'getWorkOrders', token: session.token });
 
-    workOrdersByShip = {};
-    if (result.status === 'success') {
-      result.workOrders.forEach(wo => {
-        const key = wo.shipNo || '（未分配船號）';
-        if (!workOrdersByShip[key]) workOrdersByShip[key] = [];
-        workOrdersByShip[key].push(wo);
-      });
+    if (result.status !== 'success') {
+      if (result.message && result.message.includes('逾時')) return doLogout();
+      shipSel.innerHTML = '<option value="">工單載入失敗</option>';
+      msgEl.className = 'msg msg-error';
+      msgEl.textContent = result.message || '工單載入失敗';
+      return;
     }
+
+    workOrdersByShip = {};
+    result.workOrders.forEach(wo => {
+      const key = wo.shipNo || '（未分配船號）';
+      if (!workOrdersByShip[key]) workOrdersByShip[key] = [];
+      workOrdersByShip[key].push(wo);
+    });
 
     const ships = Object.keys(workOrdersByShip).sort();
     shipSel.innerHTML = '<option value="">-- 請選擇船號 --</option>';
@@ -61,6 +68,8 @@ async function loadWorkOrders() {
     shipSel.innerHTML = '<option value="">載入失敗</option>';
     shipSel.appendChild(new Option('▶ 手動輸入臨時船號...', '__manual__'));
     shipSel.addEventListener('change', onShipChange);
+    msgEl.className = 'msg msg-error';
+    msgEl.textContent = `工單載入失敗：${e.message || e}`;
   }
 }
 
