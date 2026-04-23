@@ -19,6 +19,11 @@ async function callAPI(params) {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
   });
   const resp = await fetch(url.toString(), { redirect: 'follow' });
-  if (!resp.ok) throw new Error('API 請求失敗 (' + resp.status + ')');
-  return resp.json();
+  const text = await resp.text();
+  if (!resp.ok) throw new Error('API 請求失敗 (' + resp.status + ') ' + text.slice(0, 120));
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error('API 回傳不是 JSON：' + text.slice(0, 120));
+  }
 }

@@ -109,7 +109,8 @@ async function deleteWorkOrder(workOrderId) {
 }
 
 async function importFromSheet() {
-  const sheetUrl   = document.getElementById('importSheetUrl').value.replace(/\s+/g, '').trim();
+  const sheetInput = document.getElementById('importSheetUrl').value;
+  const sheetUrl   = extractSpreadsheetId(sheetInput);
   const sheetName  = document.getElementById('importSheetName').value.trim();
   const col        = document.getElementById('importCol').value;
   const remarkCol  = document.getElementById('importRemarkCol').value.trim();
@@ -135,7 +136,7 @@ async function importFromSheet() {
       showMsg(msgEl, 'error', result.message);
     }
   } catch (e) {
-    showMsg(msgEl, 'error', '連線失敗');
+    showMsg(msgEl, 'error', `連線失敗：${e.message || e}`);
   } finally {
     btn.disabled    = false;
     btn.textContent = '從 Google Sheet 匯入';
@@ -350,6 +351,12 @@ function enableDragScroll(el) {
 function showMsg(el, type, text) {
   el.className = type === 'success' ? 'msg msg-success' : type === 'error' ? 'msg msg-error' : 'msg hidden';
   el.textContent = text;
+}
+
+function extractSpreadsheetId(input) {
+  const text = String(input || '').replace(/\s+/g, '').trim();
+  const match = text.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : text;
 }
 
 function escHtml(str) {
