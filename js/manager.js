@@ -109,7 +109,7 @@ async function deleteWorkOrder(workOrderId) {
 }
 
 async function importFromSheet() {
-  const sheetUrl   = document.getElementById('importSheetUrl').value.trim();
+  const sheetUrl   = document.getElementById('importSheetUrl').value.replace(/\s+/g, '').trim();
   const sheetName  = document.getElementById('importSheetName').value.trim();
   const col        = document.getElementById('importCol').value;
   const remarkCol  = document.getElementById('importRemarkCol').value.trim();
