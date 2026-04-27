@@ -35,6 +35,16 @@
 
   <script src="js/api.js"></script>
   <script>
+    function normalizeNumericInputValue(value) {
+      const text = String(value || '').trim();
+      return /^\d+$/.test(text) ? '_' + text : text;
+    }
+
+    const empIdInput = document.getElementById('empId');
+    empIdInput.addEventListener('blur', () => {
+      empIdInput.value = normalizeNumericInputValue(empIdInput.value);
+    });
+
     const _t = localStorage.getItem('token');
     if (_t) {
       window.location.href = localStorage.getItem('role') === 'manager' ? 'manager.html' : 'employee.html';
@@ -48,7 +58,8 @@
       btn.textContent = '登入中...';
       msgEl.className = 'msg hidden';
       try {
-        const id  = document.getElementById('empId').value.trim();
+        const id  = normalizeNumericInputValue(document.getElementById('empId').value);
+        document.getElementById('empId').value = id;
         const pwd = await hashPassword(document.getElementById('password').value);
         const r   = await callAPI({ action: 'login', id, pwd });
         if (r.status === 'success') {

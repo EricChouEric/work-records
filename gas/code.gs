@@ -5,8 +5,8 @@
 // Master Sheet tabs required:
 //   Users      : [工號, 姓名, 密碼, 角色, 組別]
 //   Groups     : [組別, 建立時間]
-//   WorkOrders : [工單號碼, 船號, 建立時間, 備註]
-//   Reports    : [提交時間, 施工日期, 工號, 員工姓名, 組別, 工單號碼, 船號]
+//   WorkOrders : [工單號碼, 船號, 工單內容, 預估工時, 建立時間, 備註]
+//   Reports    : [提交時間, 施工日期, 工號, 員工姓名, 組別, 工單號碼, 船號, 實際工時, 類別]
 //   Sessions   : [token, userId, expiry]
 //
 // Run setupSheets() once from the GAS editor to create missing tabs.
@@ -65,21 +65,12 @@ function formatTextColumns(ws, cols) {
   cols.forEach(col => ws.getRange(1, col, maxRows, 1).setNumberFormat('@'));
 }
 
-function formatCodeColumns(ws, cols) {
-  if (!ws || !cols.length) return;
-  const maxRows = Math.max(ws.getMaxRows(), 1);
-  if (maxRows < 2) return;
-  cols.forEach(col => ws.getRange(2, col, maxRows - 1, 1).setNumberFormat('000'));
-}
-
 function formatIdentifierColumns() {
   formatTextColumns(usersSheet(),      [1, 2, 3, 4, 5]);
   formatTextColumns(groupsSheet(),     [1, 2]);
   formatTextColumns(sessionsSheet(),   [1, 2]);
-  formatCodeColumns(workOrdersSheet(), [1, 2]);
-  formatTextColumns(workOrdersSheet(), [3, 4]);
-  formatCodeColumns(reportsSheet(),    [6, 7]);
-  formatTextColumns(reportsSheet(),    [1, 2, 3, 4, 5]);
+  formatTextColumns(workOrdersSheet(), [1, 2, 3, 4, 5, 6]);
+  formatTextColumns(reportsSheet(),    [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 }
 
 function appendTextRow(ws, values, textCols) {
@@ -95,6 +86,39 @@ function appendTextRows(ws, rows, textCols) {
   ws.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
 }
 
+function setPlainTextValues(ws, row, col, values) {
+  if (!values.length || !values[0].length) return;
+  const range = ws.getRange(row, col, values.length, values[0].length);
+  range.setNumberFormat('@');
+  range.setValues(values);
+}
+
+function normalizeWorkOrdersSheetCodes_() {
+  const ws = workOrdersSheet();
+  if (!ws) throw new Error('找不到 WorkOrders 分頁');
+
+  const lastRow = ws.getLastRow();
+  if (lastRow < 2) {
+    return { count: 0, preview: '', formats: '' };
+  }
+
+  const codeRange = ws.getRange(2, 1, lastRow - 1, 2);
+  const codeRows = codeRange.getDisplayValues().map(row => [
+    sheetCodeValue(normalizeWorkOrderId(row[0])),
+    sheetCodeValue(normalizeShipNo(row[1]))
+  ]);
+
+  codeRange.clearFormat();
+  setPlainTextValues(ws, 2, 1, codeRows);
+  SpreadsheetApp.flush();
+
+  return {
+    count: codeRows.length,
+    preview: codeRange.getDisplayValues().slice(0, 5).map(r => r.join('/')).join(', '),
+    formats: codeRange.getNumberFormats().slice(0, 2).map(r => r.join('/')).join(', ')
+  };
+}
+
 // Run once from GAS editor to initialise missing sheets
 function setupSheets() {
   const ss = getMaster();
@@ -108,14 +132,25 @@ function setupSheets() {
       console.log('已建立分頁：' + name);
     } else {
       console.log('分頁已存在：' + name);
+      const oldHeaders = ws.getRange(1, 1, 1, Math.max(headers.length, ws.getLastColumn())).getDisplayValues()[0];
+      if (name === 'WorkOrders' && oldHeaders[2] === '建立時間') {
+        const lastRow = ws.getLastRow();
+        if (lastRow > 1) {
+          const oldRows = ws.getRange(2, 1, lastRow - 1, 4).getDisplayValues();
+          const migrated = oldRows.map(row => [row[0], row[1], '', '', row[2], row[3]]);
+          setPlainTextValues(ws, 2, 1, migrated);
+          console.log('已升級 WorkOrders 欄位：新增工單內容與預估工時');
+        }
+      }
     }
+    ws.getRange(1, 1, 1, headers.length).setValues([headers]);
     return ws;
   }
   ensure('Users',      ['工號', '姓名', '密碼', '角色', '組別']);
   ensure('Groups',     ['組別', '建立時間']);
   ensure('Sessions',   ['token', 'userId', 'expiry']);
-  ensure('WorkOrders', ['工單號碼', '船號', '建立時間', '備註']);
-  ensure('Reports',    ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號']);
+  ensure('WorkOrders', ['工單號碼', '船號', '工單內容', '預估工時', '建立時間', '備註']);
+  ensure('Reports',    ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號', '實際工時', '類別']);
   formatIdentifierColumns();
   console.log('setupSheets 完成');
 }
@@ -151,39 +186,42 @@ function repairWorkOrderCodes() {
 
   const range = ws.getRange(2, 1, lastRow - 1, 4);
   const rows = range.getDisplayValues().map(row => [
-    sheetCodeValue(normalizeWorkOrderId(row[0])),
-    sheetCodeValue(normalizeShipNo(row[1])),
+    String(row[0] || ''),
+    String(row[1] || ''),
     String(row[2] || ''),
     String(row[3] || '')
   ]);
+  const result = normalizeWorkOrdersSheetCodes_();
   ws.getRange(2, 1, lastRow - 1, 2).clearFormat();
-  ws.getRange(2, 1, lastRow - 1, 2).setNumberFormat('000');
-  ws.getRange(2, 3, lastRow - 1, 2).setNumberFormat('@');
-  range.setValues(rows);
+  ws.getRange(2, 3, lastRow - 1, 2).clearFormat();
+  rows.forEach((row, index) => {
+    const fixed = result.count ? ws.getRange(index + 2, 1, 1, 2).getDisplayValues()[0] : row;
+    row[0] = fixed[0];
+    row[1] = fixed[1];
+  });
+  setPlainTextValues(ws, 2, 1, rows);
   console.log(`repairWorkOrderCodes 完成，共修復 ${rows.length} 筆`);
 }
 
 function forceRepairWorkOrderCodes() {
-  const ws = workOrdersSheet();
+  const ss = getMaster();
+  const ws = ss.getSheetByName('WorkOrders');
   if (!ws) throw new Error('找不到 WorkOrders 分頁');
   const lastRow = ws.getLastRow();
-  if (lastRow < 2) return;
+  console.log('MASTER_SHEET_ID = ' + PropertiesService.getScriptProperties().getProperty('MASTER_SHEET_ID'));
+  console.log('正在修復的試算表 = ' + ss.getUrl());
+  if (lastRow < 2) {
+    console.log('WorkOrders 沒有資料需要修復');
+    return;
+  }
 
-  const codeRange = ws.getRange(2, 1, lastRow - 1, 2);
   const otherRange = ws.getRange(2, 3, lastRow - 1, 2);
-  const codeRows = codeRange.getDisplayValues().map(row => [
-    /^\d+$/.test(String(row[0]).trim()) ? Number(String(row[0]).trim()) : String(row[0]).trim(),
-    /^\d+$/.test(String(row[1]).trim()) ? Number(String(row[1]).trim()) : String(row[1]).trim()
-  ]);
-
-  codeRange.clearFormat();
   otherRange.clearFormat();
-  codeRange.setNumberFormat('000');
   otherRange.setNumberFormat('@');
-  codeRange.setValues(codeRows);
+  const result = normalizeWorkOrdersSheetCodes_();
 
-  const preview = codeRange.getDisplayValues().slice(0, 5).map(r => r.join('/')).join(', ');
-  console.log(`forceRepairWorkOrderCodes 完成，共修復 ${codeRows.length} 筆。前 5 筆：${preview}`);
+  console.log(`forceRepairWorkOrderCodes 完成，共修復 ${result.count} 筆。前 5 筆顯示值：${result.preview}`);
+  console.log(`A/B 欄格式預覽：${result.formats}`);
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -205,19 +243,38 @@ function normalizeWorkOrderId(val) {
   return normalizeThreeDigitCode(text);
 }
 
+function normalizeEmployeeId(val) {
+  const text = String(val || '').trim();
+  if (/^_\d+$/.test(text)) return text;
+  return /^\d+$/.test(text) ? '_' + text : text;
+}
+
 function normalizeThreeDigitCode(val) {
   const text = String(val || '').trim();
-  return /^\d{1,2}$/.test(text) ? text.padStart(3, '0') : text;
+  const raw = text.startsWith('_') ? text.slice(1) : text;
+  if (!/^\d+$/.test(raw)) return text;
+  const padded = raw.length < 3 ? raw.padStart(3, '0') : raw;
+  return '_' + padded;
 }
 
 function sheetText(val) {
-  const text = String(val || '').trim();
-  return text ? "'" + text : '';
+  return String(val || '').trim();
 }
 
 function sheetCodeValue(val) {
+  return String(val || '').trim();
+}
+
+function parseHours(val) {
+  const text = String(val || '').replace(/[^\d.]/g, '').trim();
+  if (!text) return 0;
+  const num = Number(text);
+  return isFinite(num) ? num : 0;
+}
+
+function normalizeReportType(val) {
   const text = String(val || '').trim();
-  return /^\d+$/.test(text) ? Number(text) : text;
+  return text || '定期';
 }
 
 function extractSpreadsheetId(input) {
@@ -228,10 +285,11 @@ function extractSpreadsheetId(input) {
 
 function findUser(userId) {
   const data = usersSheet().getDataRange().getDisplayValues();
+  const normalizedUserId = normalizeEmployeeId(userId);
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(userId)) {
+    if (normalizeEmployeeId(data[i][0]) === normalizedUserId) {
       return {
-        id:    String(data[i][0]),
+        id:    normalizeEmployeeId(data[i][0]),
         name:  String(data[i][1]),
         pwd:   String(data[i][2]),
         role:  String(data[i][3]),
@@ -295,9 +353,10 @@ function getGroups(p) {
 function register(p) {
   if (!p.id || !p.name || !p.pwd || !p.group)
     return jsonResponse({ status: 'error', message: '缺少必要參數（工號、姓名、組別、密碼）' });
+  const employeeId = normalizeEmployeeId(p.id);
   if (!groupExists(p.group)) return jsonResponse({ status: 'error', message: '請選擇有效組別' });
-  if (findUser(p.id)) return jsonResponse({ status: 'error', message: '工號已存在' });
-  appendTextRow(usersSheet(), [String(p.id), String(p.name), String(p.pwd), 'employee', String(p.group)], [1, 2, 3, 4, 5]);
+  if (findUser(employeeId)) return jsonResponse({ status: 'error', message: '工號已存在' });
+  appendTextRow(usersSheet(), [employeeId, String(p.name), String(p.pwd), 'employee', String(p.group)], [1, 2, 3, 4, 5]);
   return jsonResponse({ status: 'success', message: '註冊成功，請登入' });
 }
 
@@ -307,16 +366,17 @@ function registerManager(p) {
   const inviteCode = PropertiesService.getScriptProperties().getProperty('MANAGER_INVITE_CODE');
   if (!inviteCode) return jsonResponse({ status: 'error', message: 'MANAGER_INVITE_CODE 未設定' });
   if (p.invite !== inviteCode) return jsonResponse({ status: 'error', message: '邀請碼不正確' });
-  if (findUser(p.id)) return jsonResponse({ status: 'error', message: '工號已存在' });
-  appendTextRow(usersSheet(), [String(p.id), String(p.name), String(p.pwd), 'manager', ''], [1, 2, 3, 4, 5]);
+  const employeeId = normalizeEmployeeId(p.id);
+  if (findUser(employeeId)) return jsonResponse({ status: 'error', message: '工號已存在' });
+  appendTextRow(usersSheet(), [employeeId, String(p.name), String(p.pwd), 'manager', ''], [1, 2, 3, 4, 5]);
   return jsonResponse({ status: 'success', message: '主管帳號建立成功，請登入' });
 }
 
 function login(p) {
   if (!p.id || !p.pwd) return jsonResponse({ status: 'error', message: '缺少必要參數' });
-  const user = findUser(p.id);
+  const user = findUser(normalizeEmployeeId(p.id));
   if (!user || user.pwd !== p.pwd) return jsonResponse({ status: 'error', message: '工號或密碼錯誤' });
-  const token = createSession(p.id);
+  const token = createSession(user.id);
   return jsonResponse({ status: 'success', token, role: user.role, name: user.name, group: user.group });
 }
 
@@ -331,6 +391,9 @@ function submitReport(p) {
   const userId = validateToken(p.token);
   if (!userId) return jsonResponse({ status: 'error', message: '登入逾時，請重新登入' });
   if (!p.date || !p.workOrders || !p.shipNo) return jsonResponse({ status: 'error', message: '請填寫施工日期、工單號碼和船號' });
+  const hours = parseHours(p.hours);
+  if (hours <= 0) return jsonResponse({ status: 'error', message: '請填寫實際工時' });
+  const reportType = normalizeReportType(p.reportType);
 
   const user = findUser(userId);
   if (!user) return jsonResponse({ status: 'error', message: '找不到員工資料' });
@@ -343,16 +406,16 @@ function submitReport(p) {
   const shipNo = normalizeShipNo(p.shipNo);
   orders.forEach(order => {
     const row = sheet.getLastRow() + 1;
-    sheet.getRange(row, 1, 1, 5).setNumberFormat('@');
-    sheet.getRange(row, 6, 1, 2).setNumberFormat('000');
-    sheet.getRange(row, 1, 1, 7).setValues([[
+    setPlainTextValues(sheet, row, 1, [[
       now,
       String(p.date),
       user.id,
       user.name,
       user.group,
       sheetCodeValue(normalizeWorkOrderId(order)),
-      sheetCodeValue(shipNo)
+      sheetCodeValue(shipNo),
+      String(hours),
+      reportType
     ]]);
   });
   return jsonResponse({ status: 'success', message: `報工已儲存（共 ${orders.length} 筆）` });
@@ -369,7 +432,7 @@ function getMyReports(p) {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const displayRow = displayData[i];
-    if (String(displayRow[2]) !== userId || !row[1]) continue;
+    if (normalizeEmployeeId(displayRow[2]) !== normalizeEmployeeId(userId) || !row[1]) continue;
     const dateStr = toDateStr(row[1]);
     if (p.year && !dateStr.startsWith(p.year)) continue;
     if (p.month) {
@@ -378,10 +441,12 @@ function getMyReports(p) {
     }
     records.push({
       date:       dateStr,
-      empId:      String(displayRow[2] || ''),
+      empId:      normalizeEmployeeId(displayRow[2]),
       group:      String(displayRow[4] || ''),
-      workOrders: String(displayRow[5] || '').split(',').map(s => s.trim()).filter(Boolean),
-      shipNo:     normalizeShipNo(displayRow[6])
+      workOrders: String(displayRow[5] || '').split(',').map(s => normalizeWorkOrderId(s)).filter(Boolean),
+      shipNo:     normalizeShipNo(displayRow[6]),
+      hours:      parseHours(displayRow[7]),
+      reportType: normalizeReportType(displayRow[8])
     });
   }
   records.sort((a, b) => b.date.localeCompare(a.date));
@@ -394,14 +459,17 @@ function getWorkOrders(p) {
   const ws = workOrdersSheet();
   if (!ws) return jsonResponse({ status: 'success', workOrders: [] });
   const data = ws.getDataRange().getDisplayValues();
+  const legacyLayout = String(data[0] && data[0][2] || '') === '建立時間';
   const workOrders = [];
   for (let i = 1; i < data.length; i++) {
     if (!data[i][0]) continue;
-    // [工單號碼, 船號, 建立時間, 備註]
+    // [工單號碼, 船號, 工單內容, 預估工時, 建立時間, 備註]
     workOrders.push({
-      id:     String(data[i][0]),
+      id:     normalizeWorkOrderId(data[i][0]),
       shipNo: normalizeShipNo(data[i][1]),
-      remark: String(data[i][3] || '')
+      content: legacyLayout ? '' : String(data[i][2] || ''),
+      estimatedHours: legacyLayout ? '' : String(data[i][3] || ''),
+      remark: legacyLayout ? String(data[i][3] || '') : String(data[i][5] || '')
     });
   }
   return jsonResponse({ status: 'success', workOrders });
@@ -418,18 +486,18 @@ function addWorkOrder(p) {
   if (!p.shipNo)      return jsonResponse({ status: 'error', message: '請輸入對應船號' });
   const workOrderId = normalizeWorkOrderId(p.workOrderId);
   const shipNo = normalizeShipNo(p.shipNo);
+  const content = String(p.content || '');
+  const estimatedHours = String(p.estimatedHours || '');
 
   const ws   = workOrdersSheet();
   const data = ws.getDataRange().getDisplayValues();
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === workOrderId)
+    if (normalizeWorkOrderId(data[i][0]) === workOrderId)
       return jsonResponse({ status: 'error', message: '工單號碼已存在' });
   }
-  // [工單號碼, 船號, 建立時間, 備註]
+  // [工單號碼, 船號, 工單內容, 預估工時, 建立時間, 備註]
   const row = ws.getLastRow() + 1;
-  ws.getRange(row, 1, 1, 2).setNumberFormat('000');
-  ws.getRange(row, 3, 1, 2).setNumberFormat('@');
-  ws.getRange(row, 1, 1, 4).setValues([[sheetCodeValue(workOrderId), sheetCodeValue(shipNo), new Date().toISOString(), String(p.remark || '')]]);
+  setPlainTextValues(ws, row, 1, [[sheetCodeValue(workOrderId), sheetCodeValue(shipNo), content, estimatedHours, new Date().toISOString(), String(p.remark || '')]]);
   return jsonResponse({ status: 'success', message: '工單已新增' });
 }
 
@@ -443,7 +511,7 @@ function deleteWorkOrder(p) {
   const ws   = workOrdersSheet();
   const data = ws.getDataRange().getDisplayValues();
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(p.workOrderId)) {
+    if (normalizeWorkOrderId(data[i][0]) === normalizeWorkOrderId(p.workOrderId)) {
       ws.deleteRow(i + 1);
       return jsonResponse({ status: 'success', message: '工單已刪除' });
     }
@@ -451,7 +519,7 @@ function deleteWorkOrder(p) {
   return jsonResponse({ status: 'error', message: '找不到工單' });
 }
 
-// p.items = JSON string of [{id, shipNo, remark?}, ...]
+// p.items = JSON string of [{id, shipNo, content?, estimatedHours?, remark?}, ...]
 function importWorkOrders(p) {
   const userId = validateToken(p.token);
   if (!userId) return jsonResponse({ status: 'error', message: '登入逾時，請重新登入' });
@@ -467,22 +535,23 @@ function importWorkOrders(p) {
     return jsonResponse({ status: 'error', message: '無有效工單資料' });
 
   const ws       = workOrdersSheet();
+  normalizeWorkOrdersSheetCodes_();
   const existing = ws.getDataRange().getDisplayValues();
-  const existSet = new Set(existing.slice(1).map(r => String(r[0])));
+  const existSet = new Set(existing.slice(1).map(r => normalizeWorkOrderId(r[0])));
   const now      = new Date().toISOString();
   let added = 0, skipped = 0;
 
   for (const item of items) {
     const id     = normalizeWorkOrderId(item.id);
     const shipNo = normalizeShipNo(item.shipNo);
+    const content = String(item.content || '');
+    const estimatedHours = String(item.estimatedHours || '');
     const remark = String(item.remark || '');
     if (!id) continue;
     if (existSet.has(id)) { skipped++; continue; }
-    // [工單號碼, 船號, 建立時間, 備註]
+    // [工單號碼, 船號, 工單內容, 預估工時, 建立時間, 備註]
     const row = ws.getLastRow() + 1;
-    ws.getRange(row, 1, 1, 2).setNumberFormat('000');
-    ws.getRange(row, 3, 1, 2).setNumberFormat('@');
-    ws.getRange(row, 1, 1, 4).setValues([[sheetCodeValue(id), sheetCodeValue(shipNo), now, remark]]);
+    setPlainTextValues(ws, row, 1, [[sheetCodeValue(id), sheetCodeValue(shipNo), content, estimatedHours, now, remark]]);
     existSet.add(id);
     added++;
   }
@@ -537,9 +606,13 @@ function importGroups(p) {
   return jsonResponse({ status: 'success', message: `組別匯入完成：新增 ${rowsToAppend.length} 筆，略過重複 ${skipped} 筆` });
 }
 
-// 分頁名稱 = 船號，A欄（或 p.col 指定欄）= 工單號碼
+// 預設：分頁名稱 = 船號，A欄（或 p.col 指定欄）= 工單號碼
+// 若提供 p.shipCol，則從該欄讀取船號，適合同一張表包含多個船號的匯入格式。
 // p.sheetUrl  - Google Sheet URL or Sheet ID
 // p.col       - 1-based column index for work order IDs (default 1)
+// p.shipCol   - 1-based column index for ship numbers (optional)
+// p.contentCol - 1-based column index for work order content (optional)
+// p.estimateCol - 1-based column index for estimated hours (optional)
 // p.remarkCol - 1-based column index for remarks (optional)
 // p.startRow  - 1-based first data row (default 2, skipping header)
 // 若 p.sheetName 指定，只匯入該分頁；否則匯入所有分頁
@@ -587,9 +660,12 @@ function importFromSheet(p) {
     return jsonResponse({ status: 'error', message: '無法開啟 Google Sheet，請確認網址正確、沒有缺漏，且已分享給此腳本帳號' });
   }
 
-  const col      = Math.max(1, parseInt(p.col      || '1', 10)) - 1;
-  const remarkCol= p.remarkCol ? Math.max(1, parseInt(p.remarkCol, 10)) - 1 : -1;
-  const startRow = Math.max(1, parseInt(p.startRow || '2', 10)) - 1;
+  const col        = Math.max(1, parseInt(p.col        || '1', 10)) - 1;
+  const shipCol    = p.shipCol ? Math.max(1, parseInt(p.shipCol, 10)) - 1 : -1;
+  const contentCol = p.contentCol ? Math.max(1, parseInt(p.contentCol, 10)) - 1 : -1;
+  const estimateCol= p.estimateCol ? Math.max(1, parseInt(p.estimateCol, 10)) - 1 : -1;
+  const remarkCol  = p.remarkCol ? Math.max(1, parseInt(p.remarkCol, 10)) - 1 : -1;
+  const startRow   = Math.max(1, parseInt(p.startRow || '2', 10)) - 1;
 
   // 選擇要匯入的分頁：指定單一分頁 or 全部分頁
   const sheets = p.sheetName
@@ -599,38 +675,42 @@ function importFromSheet(p) {
   if (!sheets.length) return jsonResponse({ status: 'error', message: '找不到指定的工作表分頁' });
 
   const targetWs = workOrdersSheet();
+  normalizeWorkOrdersSheetCodes_();
   const targetLastRow = targetWs.getLastRow();
   const existing = targetLastRow > 1
     ? targetWs.getRange(2, 1, targetLastRow - 1, 1).getDisplayValues()
     : [];
-  const existSet = new Set(existing.map(r => String(r[0])));
+  const existSet = new Set(existing.map(r => normalizeWorkOrderId(r[0])));
   const now      = new Date().toISOString();
   const rowsToAppend = [];
   let   skipped = 0;
 
   for (const ws of sheets) {
-    const shipNo = normalizeShipNo(ws.getName()); // 分頁名稱即為船號
+    const defaultShipNo = normalizeShipNo(ws.getName()); // 未指定船號欄時，分頁名稱即為船號
     const lastRow = ws.getLastRow();
     if (lastRow <= startRow) continue;
 
-    const readWidth = Math.max(col, remarkCol, 0) + 1;
+    const readWidth = Math.max(col, shipCol, contentCol, estimateCol, remarkCol, 0) + 1;
     const data = ws.getRange(1, 1, lastRow, readWidth).getDisplayValues();
 
     for (let i = startRow; i < data.length; i++) {
       const id = normalizeWorkOrderId(data[i][col]);
+      const shipNo = shipCol >= 0 ? normalizeShipNo(data[i][shipCol]) : defaultShipNo;
       if (!id) continue;
+      if (!shipNo) continue;
       if (existSet.has(id)) { skipped++; continue; }
+      const content = contentCol >= 0 ? String(data[i][contentCol] || '') : '';
+      const estimatedHours = estimateCol >= 0 ? String(data[i][estimateCol] || '') : '';
       const remark = remarkCol >= 0 ? String(data[i][remarkCol] || '') : '';
-      // [工單號碼, 船號, 建立時間, 備註]
-      rowsToAppend.push([sheetCodeValue(id), sheetCodeValue(shipNo), now, remark]);
+      // [工單號碼, 船號, 工單內容, 預估工時, 建立時間, 備註]
+      rowsToAppend.push([sheetCodeValue(id), sheetCodeValue(shipNo), content, estimatedHours, now, remark]);
       existSet.add(id);
     }
   }
   if (rowsToAppend.length) {
     const appendStartRow = targetWs.getLastRow() + 1;
-    targetWs.getRange(appendStartRow, 1, rowsToAppend.length, 2).setNumberFormat('000');
-    targetWs.getRange(appendStartRow, 3, rowsToAppend.length, 2).setNumberFormat('@');
-    targetWs.getRange(appendStartRow, 1, rowsToAppend.length, 4).setValues(rowsToAppend);
+    setPlainTextValues(targetWs, appendStartRow, 1, rowsToAppend);
+    normalizeWorkOrdersSheetCodes_();
   }
   const added = rowsToAppend.length;
   return jsonResponse({ status: 'success', message: `匯入完成：新增 ${added} 筆，略過重複 ${skipped} 筆` });
@@ -638,8 +718,8 @@ function importFromSheet(p) {
 
 // ── Manager: report queries ───────────────────────────────────────────────────
 
-// Optional filters: startDate, endDate, group, empId, workOrder, shipNo
-// Optional sortBy: date (default desc) | workOrder | group | empId | shipNo
+// Optional filters: startDate, endDate, group, empId, workOrder, shipNo, reportType
+// Optional sortBy: date (default desc) | workOrder | group | empId | shipNo | hours | reportType
 function getAllReports(p) {
   const userId = validateToken(p.token);
   if (!userId) return jsonResponse({ status: 'error', message: '登入逾時，請重新登入' });
@@ -659,19 +739,22 @@ function getAllReports(p) {
     if (p.startDate  && dateStr < p.startDate)            continue;
     if (p.endDate    && dateStr > p.endDate)              continue;
     if (p.group      && String(displayRow[4]) !== p.group) continue;
-    if (p.empId      && String(displayRow[2]) !== p.empId) continue;
+    if (p.empId      && normalizeEmployeeId(displayRow[2]) !== normalizeEmployeeId(p.empId)) continue;
     if (p.workOrder) {
-      const wos = String(displayRow[5] || '').split(',').map(s => s.trim());
-      if (!wos.includes(p.workOrder)) continue;
+      const wos = String(displayRow[5] || '').split(',').map(s => normalizeWorkOrderId(s)).filter(Boolean);
+      if (!wos.includes(normalizeWorkOrderId(p.workOrder))) continue;
     }
     if (p.shipNo && normalizeShipNo(displayRow[6]) !== normalizeShipNo(p.shipNo)) continue;
+    if (p.reportType && normalizeReportType(displayRow[8]) !== normalizeReportType(p.reportType)) continue;
     records.push({
       date:       dateStr,
-      empId:      String(displayRow[2] || ''),
+      empId:      normalizeEmployeeId(displayRow[2]),
       name:       String(displayRow[3] || ''),
       group:      String(displayRow[4] || ''),
-      workOrders: String(displayRow[5] || '').split(',').map(s => s.trim()).filter(Boolean),
-      shipNo:     normalizeShipNo(displayRow[6])
+      workOrders: String(displayRow[5] || '').split(',').map(s => normalizeWorkOrderId(s)).filter(Boolean),
+      shipNo:     normalizeShipNo(displayRow[6]),
+      hours:      parseHours(displayRow[7]),
+      reportType: normalizeReportType(displayRow[8])
     });
   }
 
@@ -680,6 +763,8 @@ function getAllReports(p) {
   else if (sortBy === 'group')     records.sort((a, b) => a.group.localeCompare(b.group)         || b.date.localeCompare(a.date));
   else if (sortBy === 'empId')     records.sort((a, b) => a.empId.localeCompare(b.empId)         || b.date.localeCompare(a.date));
   else if (sortBy === 'shipNo')    records.sort((a, b) => a.shipNo.localeCompare(b.shipNo)       || b.date.localeCompare(a.date));
+  else if (sortBy === 'hours')     records.sort((a, b) => b.hours - a.hours                       || b.date.localeCompare(a.date));
+  else if (sortBy === 'reportType')records.sort((a, b) => a.reportType.localeCompare(b.reportType)|| b.date.localeCompare(a.date));
   else                             records.sort((a, b) => b.date.localeCompare(a.date));
 
   return jsonResponse({ status: 'success', records });
@@ -696,7 +781,7 @@ function getAllEmployees(p) {
   const groupSet  = new Set(getGroupNames());
   for (let i = 1; i < data.length; i++) {
     if (data[i][3] !== 'employee') continue;
-    employees.push({ id: String(data[i][0]), name: String(data[i][1]), group: String(data[i][4] || '') });
+    employees.push({ id: normalizeEmployeeId(data[i][0]), name: String(data[i][1]), group: String(data[i][4] || '') });
     if (data[i][4]) groupSet.add(String(data[i][4]));
   }
   return jsonResponse({ status: 'success', employees, groups: Array.from(groupSet).sort() });

@@ -47,6 +47,16 @@
 
   <script src="js/api.js"></script>
   <script>
+    function normalizeNumericInputValue(value) {
+      const text = String(value || '').trim();
+      return /^\d+$/.test(text) ? '_' + text : text;
+    }
+
+    const empIdInput = document.getElementById('empId');
+    empIdInput.addEventListener('blur', () => {
+      empIdInput.value = normalizeNumericInputValue(empIdInput.value);
+    });
+
     document.getElementById('managerRegForm').addEventListener('submit', async e => {
       e.preventDefault();
       const btn   = document.getElementById('submitBtn');
@@ -64,7 +74,8 @@
       msgEl.className = 'msg hidden';
 
       try {
-        const id     = document.getElementById('empId').value.trim();
+        const id     = normalizeNumericInputValue(document.getElementById('empId').value);
+        document.getElementById('empId').value = id;
         const name   = document.getElementById('name').value.trim();
         const hash   = await hashPassword(pwd);
         const invite = document.getElementById('invite').value.trim();

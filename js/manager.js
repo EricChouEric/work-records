@@ -3,14 +3,29 @@ let allEmployees = [];
 let allGroups    = [];
 let allWorkOrders = [];
 
+function normalizeNumericInputValue(value) {
+  const text = String(value || '').trim();
+  return /^\d+$/.test(text) ? '_' + text : text;
+}
+
 async function init() {
   session = requireAuth('manager');
   if (!session) return;
 
   document.getElementById('userName').textContent = session.name;
 
+  setupNumericInputNormalizers();
   setupTabs();
   await Promise.all([loadEmployeeFilters(), loadWorkOrderList(), loadGroups()]);
+}
+
+function setupNumericInputNormalizers() {
+  ['newWoId', 'newWoShip', 'rShipNo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => {
+      el.value = normalizeNumericInputValue(el.value);
+    });
+  });
 }
 
 function setupTabs() {
@@ -53,7 +68,7 @@ function renderWorkOrderList(workOrders) {
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>#</th><th>工單號碼</th><th>船號</th><th>備註</th><th></th></tr>
+          <tr><th>#</th><th>工單號碼</th><th>船號</th><th>工單內容</th><th>預估工時</th><th>備註</th><th></th></tr>
         </thead>
         <tbody>
           ${workOrders.map((wo, i) => `
@@ -61,6 +76,8 @@ function renderWorkOrderList(workOrders) {
               <td style="color:var(--text-muted)">${i + 1}</td>
               <td><strong>${escHtml(wo.id)}</strong></td>
               <td><span class="badge badge-blue">${escHtml(wo.shipNo)}</span></td>
+              <td>${escHtml(wo.content || '')}</td>
+              <td>${escHtml(wo.estimatedHours || '')}</td>
               <td>${escHtml(wo.remark)}</td>
               <td><button class="btn btn-sm" style="color:#dc2626;border:1px solid #fecaca;background:#fef2f2"
                 onclick="deleteWorkOrder('${escAttr(wo.id)}')">刪除</button></td>
@@ -71,19 +88,27 @@ function renderWorkOrderList(workOrders) {
 }
 
 async function addWorkOrder() {
-  const id     = document.getElementById('newWoId').value.trim();
-  const shipNo = document.getElementById('newWoShip').value.trim();
+  const idInput = document.getElementById('newWoId');
+  const shipInput = document.getElementById('newWoShip');
+  const id     = normalizeNumericInputValue(idInput.value);
+  const shipNo = normalizeNumericInputValue(shipInput.value);
+  const content = document.getElementById('newWoContent').value.trim();
+  const estimatedHours = document.getElementById('newWoEstimate').value.trim();
   const remark = document.getElementById('newWoRemark').value.trim();
   const msgEl  = document.getElementById('addWoMsg');
+  idInput.value = id;
+  shipInput.value = shipNo;
   if (!id)     { showMsg(msgEl, 'error', '請輸入工單號碼'); return; }
   if (!shipNo) { showMsg(msgEl, 'error', '請輸入對應船號'); return; }
 
   try {
-    const result = await callAPI({ action: 'addWorkOrder', token: session.token, workOrderId: id, shipNo, remark });
+    const result = await callAPI({ action: 'addWorkOrder', token: session.token, workOrderId: id, shipNo, content, estimatedHours, remark });
     if (result.status === 'success') {
       showMsg(msgEl, 'success', result.message);
       document.getElementById('newWoId').value    = '';
       document.getElementById('newWoShip').value  = '';
+      document.getElementById('newWoContent').value = '';
+      document.getElementById('newWoEstimate').value = '';
       document.getElementById('newWoRemark').value = '';
       await loadWorkOrderList();
     } else {
@@ -112,7 +137,11 @@ async function importFromSheet() {
   const sheetInput = document.getElementById('importSheetUrl').value;
   const sheetUrl   = extractSpreadsheetId(sheetInput);
   const sheetName  = document.getElementById('importSheetName').value.trim();
+  const startRow   = document.getElementById('importStartRow').value;
+  const shipCol    = document.getElementById('importShipCol').value.trim();
   const col        = document.getElementById('importCol').value;
+  const contentCol = document.getElementById('importContentCol').value.trim();
+  const estimateCol= document.getElementById('importEstimateCol').value.trim();
   const remarkCol  = document.getElementById('importRemarkCol').value.trim();
   const msgEl      = document.getElementById('importMsg');
 
@@ -124,8 +153,11 @@ async function importFromSheet() {
   showMsg(msgEl, '', '');
 
   try {
-    const params = { action: 'importFromSheet', token: session.token, sheetUrl, col };
+    const params = { action: 'importFromSheet', token: session.token, sheetUrl, col, startRow };
     if (sheetName) params.sheetName = sheetName;
+    if (shipCol) params.shipCol = shipCol;
+    if (contentCol) params.contentCol = contentCol;
+    if (estimateCol) params.estimateCol = estimateCol;
     if (remarkCol) params.remarkCol = remarkCol;
 
     const result = await callAPI(params);
@@ -244,7 +276,7 @@ async function loadRecords() {
   const countEl = document.getElementById('recordsCount');
   const btn    = document.getElementById('rQueryBtn');
 
-  tbody.innerHTML  = '<tr><td colspan="5" class="loading">載入中...</td></tr>';
+  tbody.innerHTML  = '<tr><td colspan="7" class="loading">載入中...</td></tr>';
   countEl.textContent = '';
   btn.disabled = true;
 
@@ -256,22 +288,24 @@ async function loadRecords() {
     group:     document.getElementById('rGroup').value      || undefined,
     empId:     document.getElementById('rEmpId').value      || undefined,
     workOrder: document.getElementById('rWorkOrder').value  || undefined,
-    shipNo:    document.getElementById('rShipNo').value.trim() || undefined,
+    shipNo:    normalizeNumericInputValue(document.getElementById('rShipNo').value) || undefined,
+    reportType: document.getElementById('rReportType').value || undefined,
     sortBy:    document.getElementById('rSortBy').value
   };
+  document.getElementById('rShipNo').value = params.shipNo || '';
 
   try {
     const result = await callAPI(params);
     if (result.status !== 'success') {
       if (result.message.includes('逾時')) return doLogout();
-      tbody.innerHTML = `<tr><td colspan="5" class="empty">${result.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="empty">${result.message}</td></tr>`;
       return;
     }
     const records = result.records;
     countEl.textContent = `共 ${records.length} 筆`;
 
     if (!records.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">此條件無記錄</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">此條件無記錄</td></tr>';
       return;
     }
     tbody.innerHTML = records.map(r => `
@@ -281,9 +315,11 @@ async function loadRecords() {
         <td><span class="badge badge-green">${escHtml(r.group)}</span></td>
         <td>${escHtml(r.shipNo)}</td>
         <td>${(r.workOrders||[]).map(w => `<span class="badge badge-blue">${escHtml(w)}</span>`).join(' ')}</td>
+        <td>${escHtml(r.hours)}</td>
+        <td>${escHtml(r.reportType)}</td>
       </tr>`).join('');
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">載入失敗</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">載入失敗</td></tr>';
   } finally {
     btn.disabled = false;
   }
@@ -297,7 +333,8 @@ async function loadStats() {
     token:     session.token,
     startDate: document.getElementById('sStartDate').value || undefined,
     endDate:   document.getElementById('sEndDate').value   || undefined,
-    group:     document.getElementById('sGroup').value     || undefined
+    group:     document.getElementById('sGroup').value     || undefined,
+    reportType: document.getElementById('sReportType').value || undefined
   };
 
   ['statsByWorkOrder', 'statsByShip', 'statsByGroup', 'statsByEmp', 'statsTimeline'].forEach(id => {
@@ -321,10 +358,10 @@ async function loadStats() {
       return;
     }
 
-    renderCountTable('statsByWorkOrder', countByWorkOrders(records), '工單號碼', 'badge-blue');
-    renderCountTable('statsByShip',      countBy(records, 'shipNo'),    '船號',     '');
-    renderCountTable('statsByGroup',     countBy(records, 'group'),     '組別',     'badge-green');
-    renderCountTable('statsByEmp',       countByEmp(records),           '員工',     '');
+    renderCountTable('statsByWorkOrder', sumByWorkOrders(records), '工單號碼', 'badge-blue');
+    renderCountTable('statsByShip',      sumBy(records, 'shipNo'),    '船號',     '');
+    renderCountTable('statsByGroup',     sumBy(records, 'group'),     '組別',     'badge-green');
+    renderCountTable('statsByEmp',       sumByEmp(records),           '員工',     '');
     renderTimeline('statsTimeline', records);
   } catch (e) {
     ['statsByWorkOrder', 'statsByShip', 'statsByGroup', 'statsByEmp', 'statsTimeline'].forEach(id => {
@@ -339,22 +376,31 @@ function countBy(records, field) {
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 }
 
-function countByWorkOrders(records) {
+function sumBy(records, field) {
   const map = {};
   records.forEach(r => {
-    (r.workOrders || []).forEach(w => { map[w] = (map[w] || 0) + 1; });
+    const k = r[field] || '未設定';
+    map[k] = (map[k] || 0) + Number(r.hours || 0);
   });
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 }
 
-function countByEmp(records) {
+function sumByWorkOrders(records) {
+  const map = {};
+  records.forEach(r => {
+    (r.workOrders || []).forEach(w => { map[w] = (map[w] || 0) + Number(r.hours || 0); });
+  });
+  return Object.entries(map).sort((a, b) => b[1] - a[1]);
+}
+
+function sumByEmp(records) {
   const map = {};
   records.forEach(r => {
     const k = r.empId;
-    if (!map[k]) map[k] = { label: `${r.empId} ${r.name}`, count: 0 };
-    map[k].count++;
+    if (!map[k]) map[k] = { label: `${r.empId} ${r.name}`, hours: 0 };
+    map[k].hours += Number(r.hours || 0);
   });
-  return Object.values(map).sort((a, b) => b.count - a.count).map(v => [v.label, v.count]);
+  return Object.values(map).sort((a, b) => b.hours - a.hours).map(v => [v.label, v.hours]);
 }
 
 function renderCountTable(elId, entries, label, badgeClass) {
@@ -363,12 +409,12 @@ function renderCountTable(elId, entries, label, badgeClass) {
   el.innerHTML = `
     <div class="table-wrap">
       <table>
-        <thead><tr><th>${label}</th><th style="text-align:right">筆數</th></tr></thead>
+        <thead><tr><th>${label}</th><th style="text-align:right">總工時</th></tr></thead>
         <tbody>
           ${entries.map(([k, v]) => `
             <tr>
               <td>${badgeClass ? `<span class="badge ${badgeClass}">${escHtml(k)}</span>` : escHtml(k)}</td>
-              <td style="text-align:right;font-weight:600">${v}</td>
+              <td style="text-align:right;font-weight:600">${formatHours(v)}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -378,7 +424,7 @@ function renderCountTable(elId, entries, label, badgeClass) {
 function renderTimeline(elId, records) {
   const el    = document.getElementById(elId);
   const byDay = {};
-  records.forEach(r => { byDay[r.date] = (byDay[r.date] || 0) + 1; });
+  records.forEach(r => { byDay[r.date] = (byDay[r.date] || 0) + Number(r.hours || 0); });
   const days  = Object.entries(byDay).sort((a, b) => a[0].localeCompare(b[0]));
   const max   = Math.max(...days.map(d => d[1]));
   const CHART_H = 132; // px — bar area height (160 total minus label space)
@@ -388,7 +434,7 @@ function renderTimeline(elId, records) {
     const label = date.slice(5); // MM-DD
     return `
       <div class="tl-col">
-        <span class="tl-count">${count}</span>
+        <span class="tl-count">${formatHours(count)}</span>
         <div class="tl-bar" style="height:${h}px"></div>
         <span class="tl-date">${label}</span>
       </div>`;
@@ -420,6 +466,11 @@ function enableDragScroll(el) {
 function showMsg(el, type, text) {
   el.className = type === 'success' ? 'msg msg-success' : type === 'error' ? 'msg msg-error' : 'msg hidden';
   el.textContent = text;
+}
+
+function formatHours(value) {
+  const num = Number(value || 0);
+  return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, '');
 }
 
 function extractSpreadsheetId(input) {

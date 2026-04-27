@@ -1,6 +1,11 @@
 let session;
 let workOrdersByShip = {}; // { shipNo: [{id, remark}] }
 
+function normalizeNumericInputValue(value) {
+  const text = String(value || '').trim();
+  return /^\d+$/.test(text) ? '_' + text : text;
+}
+
 async function init() {
   session = requireAuth('employee');
   if (!session) return;
@@ -17,6 +22,7 @@ async function init() {
   yearInput.value  = String(now.getFullYear());
   monthInput.value = String(now.getMonth() + 1).padStart(2, '0');
 
+  setupNumericInputNormalizers();
   setupTabs();
   await loadWorkOrders();
 
@@ -24,6 +30,14 @@ async function init() {
   document.getElementById('filterApply').addEventListener('click', loadRecords);
 
   await loadRecords();
+}
+
+function setupNumericInputNormalizers() {
+  document.addEventListener('blur', e => {
+    if (e.target.matches('#shipManual, .manual-wo-input, .extra-wo-input')) {
+      e.target.value = normalizeNumericInputValue(e.target.value);
+    }
+  }, true);
 }
 
 function setupTabs() {
@@ -102,7 +116,10 @@ function renderCheckboxes(orders) {
     return;
   }
   wrap.innerHTML = orders.map(wo => {
-    const label = wo.remark ? `${escHtml(wo.id)}（${escHtml(wo.remark)}）` : escHtml(wo.id);
+    const details = [wo.content, wo.estimatedHours ? `預估 ${wo.estimatedHours}` : '', wo.remark]
+      .filter(Boolean)
+      .join(' / ');
+    const label = details ? `${escHtml(wo.id)}（${escHtml(details)}）` : escHtml(wo.id);
     return `
       <label class="check-item">
         <input type="checkbox" class="wo-check" value="${escAttr(wo.id)}">
@@ -115,16 +132,24 @@ function getSubmitValues() {
   const shipSel = document.getElementById('shipSelect');
 
   if (shipSel.value === '__manual__') {
-    const shipNo = document.getElementById('shipManual').value.trim();
+    const shipInput = document.getElementById('shipManual');
+    const shipNo = normalizeNumericInputValue(shipInput.value);
+    shipInput.value = shipNo;
     const orders = [...document.querySelectorAll('.manual-wo-input')]
-      .map(el => el.value.trim()).filter(Boolean);
+      .map(el => {
+        el.value = normalizeNumericInputValue(el.value);
+        return el.value;
+      }).filter(Boolean);
     return { shipNo, workOrders: orders.join(',') };
   }
 
   const shipNo  = shipSel.value;
   const checked = [...document.querySelectorAll('.wo-check:checked')].map(c => c.value);
   const extras  = [...document.querySelectorAll('.extra-wo-input')]
-    .map(el => el.value.trim()).filter(Boolean);
+    .map(el => {
+      el.value = normalizeNumericInputValue(el.value);
+      return el.value;
+    }).filter(Boolean);
   return { shipNo, workOrders: [...checked, ...extras].join(',') };
 }
 
@@ -158,6 +183,8 @@ async function handleSubmit(e) {
   const msgEl = document.getElementById('reportMsg');
 
   const { shipNo, workOrders } = getSubmitValues();
+  const hours = Number(document.getElementById('hours').value);
+  const reportType = document.getElementById('reportType').value;
 
   if (!shipNo) {
     msgEl.className   = 'msg msg-error';
@@ -167,6 +194,11 @@ async function handleSubmit(e) {
   if (!workOrders) {
     msgEl.className   = 'msg msg-error';
     msgEl.textContent = '請至少勾選一個工單號碼';
+    return;
+  }
+  if (!hours || hours <= 0) {
+    msgEl.className   = 'msg msg-error';
+    msgEl.textContent = '請填寫實際工時';
     return;
   }
 
@@ -180,7 +212,9 @@ async function handleSubmit(e) {
       token:      session.token,
       date:       document.getElementById('date').value,
       shipNo,
-      workOrders
+      workOrders,
+      hours,
+      reportType
     });
 
     if (result.status === 'success') {
@@ -212,16 +246,16 @@ async function loadRecords() {
   const month = document.getElementById('filterMonth').value;
   const tbody = document.getElementById('recordsTbody');
 
-  tbody.innerHTML = '<tr><td colspan="4" class="loading">載入中...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="loading">載入中...</td></tr>';
   try {
     const result = await callAPI({ action: 'getMyReports', token: session.token, year, month });
     if (result.status !== 'success') {
       if (result.message.includes('逾時')) return doLogout();
-      tbody.innerHTML = `<tr><td colspan="4" class="empty">${result.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty">${result.message}</td></tr>`;
       return;
     }
     if (!result.records.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="empty">此期間無記錄</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">此期間無記錄</td></tr>';
       return;
     }
     tbody.innerHTML = result.records.map(r => `
@@ -229,10 +263,12 @@ async function loadRecords() {
         <td>${r.date}</td>
         <td>${escHtml(r.shipNo)}</td>
         <td>${r.workOrders.map(w => `<span class="badge badge-blue">${escHtml(w)}</span>`).join(' ')}</td>
+        <td>${escHtml(r.hours)}</td>
+        <td>${escHtml(r.reportType)}</td>
         <td>${escHtml(r.group)}</td>
       </tr>`).join('');
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty">載入失敗</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">載入失敗</td></tr>';
   }
 }
 
