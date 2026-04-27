@@ -46,9 +46,9 @@
       <!-- 從 Google Sheet 匯入 -->
       <div class="card">
         <div class="card-title">從 Google Sheet 匯入工單</div>
-        <p class="helper-text">可用「分頁名稱」當船號，也可指定船號欄。參考測試檔格式：E 欄船號、F 欄工單、G 欄工單內容、H 欄預估工時。</p>
+        <p class="helper-text">預設使用測試檔格式：同一張表內 E 欄船號、F 欄工單、G 欄工單內容、H 欄預估工時。若要改用分頁名稱當船號，清空船號欄即可。</p>
         <div class="import-example">
-          <span>測試檔建議設定：指定分頁「工作表1」，起始列 2，船號欄 5，工單欄 6，內容欄 7，預估工時欄 8。</span>
+          <span>test_numeric_ship_employee_ids.xlsx 上傳轉成 Google Sheet 後，直接貼網址即可；分頁預設為「工作表1」。</span>
         </div>
         <div class="form-group" style="margin-top:.75rem">
           <label>Google Sheet 網址</label>
@@ -57,27 +57,27 @@
         <div class="form-row" style="grid-template-columns:repeat(3,1fr);gap:.75rem">
           <div class="form-group">
             <label>指定分頁（留空=全部分頁）</label>
-            <input type="text" id="importSheetName" placeholder="例：工作表1">
+            <input type="text" id="importSheetName" value="工作表1" placeholder="例：工作表1">
           </div>
           <div class="form-group">
             <label>起始列</label>
             <input type="number" id="importStartRow" value="2" min="1">
           </div>
           <div class="form-group">
-            <label>船號欄（留空=分頁名稱）</label>
-            <input type="number" id="importShipCol" placeholder="例：5" min="1">
+            <label>船號欄</label>
+            <input type="number" id="importShipCol" value="5" min="1">
           </div>
           <div class="form-group">
             <label>工單號碼欄（欄位編號）</label>
             <input type="number" id="importCol" value="6" min="1">
           </div>
           <div class="form-group">
-            <label>工單內容欄（留空=無）</label>
-            <input type="number" id="importContentCol" placeholder="例：7" min="1">
+            <label>工單內容欄</label>
+            <input type="number" id="importContentCol" value="7" min="1">
           </div>
           <div class="form-group">
-            <label>預估工時欄（留空=無）</label>
-            <input type="number" id="importEstimateCol" placeholder="例：8" min="1">
+            <label>預估工時欄</label>
+            <input type="number" id="importEstimateCol" value="8" min="1">
           </div>
           <div class="form-group">
             <label>備註欄（留空=無）</label>
