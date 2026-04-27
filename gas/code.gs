@@ -277,6 +277,14 @@ function normalizeReportType(val) {
   return text || '定期';
 }
 
+function findHeaderIndex_(headers, names) {
+  for (let i = 0; i < headers.length; i++) {
+    const header = String(headers[i] || '').replace(/\s+/g, '').trim();
+    if (names.includes(header)) return i;
+  }
+  return -1;
+}
+
 function extractSpreadsheetId(input) {
   const text = String(input || '').replace(/\s+/g, '').trim();
   const match = text.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
@@ -667,10 +675,14 @@ function importFromSheet(p) {
   const remarkCol  = p.remarkCol ? Math.max(1, parseInt(p.remarkCol, 10)) - 1 : -1;
   const startRow   = Math.max(1, parseInt(p.startRow || '2', 10)) - 1;
 
-  // 選擇要匯入的分頁：指定單一分頁 or 全部分頁
-  const sheets = p.sheetName
-    ? [ss.getSheetByName(p.sheetName)].filter(Boolean)
-    : ss.getSheets();
+  // 選擇要匯入的分頁：指定單一分頁 or 全部分頁。若指定名稱不存在但只有一個分頁，回退讀取該分頁。
+  let sheets = [];
+  if (p.sheetName) {
+    const specified = ss.getSheetByName(p.sheetName);
+    sheets = specified ? [specified] : (ss.getSheets().length === 1 ? ss.getSheets() : []);
+  } else {
+    sheets = ss.getSheets();
+  }
 
   if (!sheets.length) return jsonResponse({ status: 'error', message: '找不到指定的工作表分頁' });
 
@@ -690,18 +702,41 @@ function importFromSheet(p) {
     const lastRow = ws.getLastRow();
     if (lastRow <= startRow) continue;
 
-    const readWidth = Math.max(col, shipCol, contentCol, estimateCol, remarkCol, 0) + 1;
+    let effectiveCol = col;
+    let effectiveShipCol = shipCol;
+    let effectiveContentCol = contentCol;
+    let effectiveEstimateCol = estimateCol;
+    let effectiveRemarkCol = remarkCol;
+    let effectiveStartRow = startRow;
+
+    const headerWidth = Math.max(col, shipCol, contentCol, estimateCol, remarkCol, 8) + 1;
+    const headers = ws.getRange(1, 1, 1, headerWidth).getDisplayValues()[0];
+    const detectedShipCol = findHeaderIndex_(headers, ['船號']);
+    const detectedOrderCol = findHeaderIndex_(headers, ['工單', '工單號碼']);
+    const detectedContentCol = findHeaderIndex_(headers, ['工單內容', '內容']);
+    const detectedEstimateCol = findHeaderIndex_(headers, ['預估工時', '預估時數']);
+    const detectedRemarkCol = findHeaderIndex_(headers, ['備註', '備註(選填)']);
+    if (detectedOrderCol >= 0) {
+      effectiveCol = detectedOrderCol;
+      effectiveStartRow = Math.max(effectiveStartRow, 1);
+    }
+    if (detectedShipCol >= 0) effectiveShipCol = detectedShipCol;
+    if (detectedContentCol >= 0) effectiveContentCol = detectedContentCol;
+    if (detectedEstimateCol >= 0) effectiveEstimateCol = detectedEstimateCol;
+    if (detectedRemarkCol >= 0) effectiveRemarkCol = detectedRemarkCol;
+
+    const readWidth = Math.max(effectiveCol, effectiveShipCol, effectiveContentCol, effectiveEstimateCol, effectiveRemarkCol, 0) + 1;
     const data = ws.getRange(1, 1, lastRow, readWidth).getDisplayValues();
 
-    for (let i = startRow; i < data.length; i++) {
-      const id = normalizeWorkOrderId(data[i][col]);
-      const shipNo = shipCol >= 0 ? normalizeShipNo(data[i][shipCol]) : defaultShipNo;
+    for (let i = effectiveStartRow; i < data.length; i++) {
+      const id = normalizeWorkOrderId(data[i][effectiveCol]);
+      const shipNo = effectiveShipCol >= 0 ? normalizeShipNo(data[i][effectiveShipCol]) : defaultShipNo;
       if (!id) continue;
       if (!shipNo) continue;
       if (existSet.has(id)) { skipped++; continue; }
-      const content = contentCol >= 0 ? String(data[i][contentCol] || '') : '';
-      const estimatedHours = estimateCol >= 0 ? String(data[i][estimateCol] || '') : '';
-      const remark = remarkCol >= 0 ? String(data[i][remarkCol] || '') : '';
+      const content = effectiveContentCol >= 0 ? String(data[i][effectiveContentCol] || '') : '';
+      const estimatedHours = effectiveEstimateCol >= 0 ? String(data[i][effectiveEstimateCol] || '') : '';
+      const remark = effectiveRemarkCol >= 0 ? String(data[i][effectiveRemarkCol] || '') : '';
       // [工單號碼, 船號, 工單內容, 預估工時, 建立時間, 備註]
       rowsToAppend.push([sheetCodeValue(id), sheetCodeValue(shipNo), content, estimatedHours, now, remark]);
       existSet.add(id);

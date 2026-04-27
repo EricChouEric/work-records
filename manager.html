@@ -48,7 +48,7 @@
         <div class="card-title">從 Google Sheet 匯入工單</div>
         <p class="helper-text">預設使用測試檔格式：同一張表內 E 欄船號、F 欄工單、G 欄工單內容、H 欄預估工時。若要改用分頁名稱當船號，清空船號欄即可。</p>
         <div class="import-example">
-          <span>test_numeric_ship_employee_ids.xlsx 上傳轉成 Google Sheet 後，直接貼網址即可；分頁預設為「工作表1」。</span>
+          <span>test_numeric_ship_employee_ids.xlsx 上傳轉成 Google Sheet 後，直接貼網址即可；系統會讀取表內船號欄。</span>
         </div>
         <div class="form-group" style="margin-top:.75rem">
           <label>Google Sheet 網址</label>
@@ -57,7 +57,7 @@
         <div class="form-row" style="grid-template-columns:repeat(3,1fr);gap:.75rem">
           <div class="form-group">
             <label>指定分頁（留空=全部分頁）</label>
-            <input type="text" id="importSheetName" value="工作表1" placeholder="例：工作表1">
+            <input type="text" id="importSheetName" placeholder="留空讀取全部分頁">
           </div>
           <div class="form-group">
             <label>起始列</label>
