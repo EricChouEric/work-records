@@ -32,6 +32,7 @@ function doGet(e) {
       case 'importFromSheet':  return importFromSheet(e.parameter);
       case 'getAllReports':    return getAllReports(e.parameter);
       case 'getAllEmployees':  return getAllEmployees(e.parameter);
+      case 'getVersion':       return getVersion(e.parameter);
       default:                 return jsonResponse({ status: 'error', message: '未知操作' });
     }
   } catch (err) {
@@ -356,6 +357,15 @@ function groupExists(groupName) {
 
 function getGroups(p) {
   return jsonResponse({ status: 'success', groups: getGroupNames() });
+}
+
+function getVersion(p) {
+  return jsonResponse({
+    status: 'success',
+    version: '20260427-workorder-columns-v2',
+    workOrdersColumns: ['工單號碼', '船號', '工單內容', '預估工時', '建立時間', '備註'],
+    reportsColumns: ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號', '實際工時', '類別']
+  });
 }
 
 function register(p) {

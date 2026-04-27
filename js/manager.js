@@ -153,6 +153,12 @@ async function importFromSheet() {
   showMsg(msgEl, '', '');
 
   try {
+    const version = await callAPI({ action: 'getVersion' });
+    if (version.status !== 'success' || version.version !== '20260427-workorder-columns-v2') {
+      showMsg(msgEl, 'error', 'GAS Web App 尚未更新到新版匯入程式，請先重新部署 Apps Script。');
+      return;
+    }
+
     const params = { action: 'importFromSheet', token: session.token, sheetUrl, col, startRow };
     if (sheetName) params.sheetName = sheetName;
     if (shipCol) params.shipCol = shipCol;
