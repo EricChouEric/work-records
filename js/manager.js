@@ -4,8 +4,7 @@ let allGroups    = [];
 let allWorkOrders = [];
 
 function normalizeNumericInputValue(value) {
-  const text = String(value || '').trim();
-  return /^\d+$/.test(text) ? '_' + text : text;
+  return String(value || '').trim().replace(/^_(?=\d+$)/, '');
 }
 
 async function init() {
@@ -154,7 +153,7 @@ async function importFromSheet() {
 
   try {
     const version = await callAPI({ action: 'getVersion' });
-    if (version.status !== 'success' || version.version !== '20260427-workorder-columns-v2') {
+    if (version.status !== 'success' || version.version !== '20260428-no-underscore-v3') {
       showMsg(msgEl, 'error', 'GAS Web App 尚未更新到新版匯入程式，請先重新部署 Apps Script。');
       return;
     }

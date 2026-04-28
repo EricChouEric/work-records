@@ -225,6 +225,42 @@ function forceRepairWorkOrderCodes() {
   console.log(`A/B 欄格式預覽：${result.formats}`);
 }
 
+function repairUnderscorePrefixes() {
+  function stripRange(ws, row, col, numRows) {
+    if (!ws || numRows <= 0) return 0;
+    const values = ws.getRange(row, col, numRows, 1).getDisplayValues()
+      .map(r => [String(r[0] || '').trim().replace(/^_(?=\d+$)/, '')]);
+    setPlainTextValues(ws, row, col, values);
+    return values.length;
+  }
+
+  const users = usersSheet();
+  const sessions = sessionsSheet();
+  const workOrders = workOrdersSheet();
+  const reports = reportsSheet();
+  const counts = [];
+
+  if (users && users.getLastRow() > 1) {
+    counts.push(`Users 工號 ${stripRange(users, 2, 1, users.getLastRow() - 1)} 筆`);
+  }
+  if (sessions && sessions.getLastRow() > 1) {
+    counts.push(`Sessions userId ${stripRange(sessions, 2, 2, sessions.getLastRow() - 1)} 筆`);
+  }
+  if (workOrders && workOrders.getLastRow() > 1) {
+    const rows = workOrders.getLastRow() - 1;
+    counts.push(`WorkOrders 工單 ${stripRange(workOrders, 2, 1, rows)} 筆`);
+    counts.push(`WorkOrders 船號 ${stripRange(workOrders, 2, 2, rows)} 筆`);
+  }
+  if (reports && reports.getLastRow() > 1) {
+    const rows = reports.getLastRow() - 1;
+    counts.push(`Reports 工號 ${stripRange(reports, 2, 3, rows)} 筆`);
+    counts.push(`Reports 工單 ${stripRange(reports, 2, 6, rows)} 筆`);
+    counts.push(`Reports 船號 ${stripRange(reports, 2, 7, rows)} 筆`);
+  }
+
+  console.log('repairUnderscorePrefixes 完成：' + counts.join('，'));
+}
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 function toDateStr(val) {
@@ -246,16 +282,14 @@ function normalizeWorkOrderId(val) {
 
 function normalizeEmployeeId(val) {
   const text = String(val || '').trim();
-  if (/^_\d+$/.test(text)) return text;
-  return /^\d+$/.test(text) ? '_' + text : text;
+  return /^_\d+$/.test(text) ? text.slice(1) : text;
 }
 
 function normalizeThreeDigitCode(val) {
   const text = String(val || '').trim();
   const raw = text.startsWith('_') ? text.slice(1) : text;
   if (!/^\d+$/.test(raw)) return text;
-  const padded = raw.length < 3 ? raw.padStart(3, '0') : raw;
-  return '_' + padded;
+  return raw.length < 3 ? raw.padStart(3, '0') : raw;
 }
 
 function sheetText(val) {
@@ -362,7 +396,7 @@ function getGroups(p) {
 function getVersion(p) {
   return jsonResponse({
     status: 'success',
-    version: '20260427-workorder-columns-v2',
+    version: '20260428-no-underscore-v3',
     workOrdersColumns: ['工單號碼', '船號', '工單內容', '預估工時', '建立時間', '備註'],
     reportsColumns: ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號', '實際工時', '類別']
   });

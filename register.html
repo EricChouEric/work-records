@@ -48,8 +48,7 @@
   <script src="js/api.js?v=20260423-2"></script>
   <script>
     function normalizeNumericInputValue(value) {
-      const text = String(value || '').trim();
-      return /^\d+$/.test(text) ? '_' + text : text;
+      return String(value || '').trim().replace(/^_(?=\d+$)/, '');
     }
 
     const empIdInput = document.getElementById('empId');

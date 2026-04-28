@@ -2,8 +2,7 @@ let session;
 let workOrdersByShip = {}; // { shipNo: [{id, remark}] }
 
 function normalizeNumericInputValue(value) {
-  const text = String(value || '').trim();
-  return /^\d+$/.test(text) ? '_' + text : text;
+  return String(value || '').trim().replace(/^_(?=\d+$)/, '');
 }
 
 async function init() {
