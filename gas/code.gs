@@ -302,10 +302,11 @@ function sheetCodeValue(val) {
 }
 
 function parseHours(val) {
-  const text = String(val || '').replace(/[^\d.]/g, '').trim();
+  const text = String(val || '').trim();
   if (!text) return 0;
+  if (!/^\d+(\.5)?$/.test(text)) return 0;
   const num = Number(text);
-  return isFinite(num) ? num : 0;
+  return isFinite(num) && num > 0 ? num : 0;
 }
 
 function normalizeReportType(val) {
@@ -397,7 +398,7 @@ function getGroups(p) {
 function getVersion(p) {
   return jsonResponse({
     status: 'success',
-    version: '20260429-per-order-hours-v5',
+    version: '20260430-hour-format-v6',
     workOrdersColumns: ['工單號碼', '船號', '工單內容', '預估工時', '建立時間', '備註'],
     reportsColumns: ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號', '實際工時', '類別']
   });
@@ -469,7 +470,7 @@ function submitReport(p) {
   }
 
   if (!reportItems.length) return jsonResponse({ status: 'error', message: '請至少填入一個工單號碼' });
-  if (reportItems.some(item => item.hours <= 0)) return jsonResponse({ status: 'error', message: '請填寫每個工單的工時' });
+  if (reportItems.some(item => item.hours <= 0)) return jsonResponse({ status: 'error', message: '工時只能填整數或 .5，例如 1、1.5、2.5' });
 
   const sheet = reportsSheet();
   const now   = new Date().toISOString();

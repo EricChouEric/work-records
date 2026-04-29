@@ -5,6 +5,13 @@ function normalizeNumericInputValue(value) {
   return String(value || '').trim().replace(/^_(?=\d+$)/, '');
 }
 
+function parseValidHours(value) {
+  const text = String(value || '').trim();
+  if (!/^\d+(\.5)?$/.test(text)) return 0;
+  const hours = Number(text);
+  return hours > 0 ? hours : 0;
+}
+
 async function init() {
   session = requireAuth('employee');
   if (!session) return;
@@ -148,7 +155,7 @@ function getSubmitValues() {
       .map(el => {
         el.value = normalizeNumericInputValue(el.value);
         const row = el.closest('.manual-wo-row');
-        return { id: el.value, hours: Number(row.querySelector('.wo-hours-input').value) };
+        return { id: el.value, hours: row.querySelector('.wo-hours-input').value.trim() };
       }).filter(item => item.id);
     return { shipNo, items: orders };
   }
@@ -156,13 +163,13 @@ function getSubmitValues() {
   const shipNo  = shipSel.value;
   const checked = [...document.querySelectorAll('.wo-check:checked')].map(c => {
     const row = c.closest('.check-item');
-    return { id: c.value, hours: Number(row.querySelector('.wo-hours-input').value) };
+    return { id: c.value, hours: row.querySelector('.wo-hours-input').value.trim() };
   });
   const extras  = [...document.querySelectorAll('.extra-wo-input')]
     .map(el => {
       el.value = normalizeNumericInputValue(el.value);
       const row = el.closest('.manual-wo-row');
-      return { id: el.value, hours: Number(row.querySelector('.wo-hours-input').value) };
+      return { id: el.value, hours: row.querySelector('.wo-hours-input').value.trim() };
     }).filter(item => item.id);
   return { shipNo, items: [...checked, ...extras] };
 }
@@ -211,11 +218,13 @@ async function handleSubmit(e) {
     msgEl.textContent = '請至少勾選一個工單號碼';
     return;
   }
-  if (items.some(item => !item.hours || item.hours <= 0)) {
+  if (items.some(item => !parseValidHours(item.hours))) {
     msgEl.className   = 'msg msg-error';
-    msgEl.textContent = '請填寫每個工單的工時';
+    msgEl.textContent = '工時只能填整數或 .5，例如 1、1.5、2.5';
     return;
   }
+
+  items.forEach(item => { item.hours = String(parseValidHours(item.hours)); });
 
   btn.disabled    = true;
   btn.textContent = '送出中...';

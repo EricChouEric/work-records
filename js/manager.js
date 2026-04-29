@@ -153,7 +153,7 @@ async function importFromSheet() {
 
   try {
     const version = await callAPI({ action: 'getVersion' });
-    if (version.status !== 'success' || !['20260428-no-underscore-v3', '20260429-delete-group-v4', '20260429-per-order-hours-v5'].includes(version.version)) {
+    if (version.status !== 'success' || !['20260428-no-underscore-v3', '20260429-delete-group-v4', '20260429-per-order-hours-v5', '20260430-hour-format-v6'].includes(version.version)) {
       showMsg(msgEl, 'error', 'GAS Web App 尚未更新到新版匯入程式，請先重新部署 Apps Script。');
       return;
     }
