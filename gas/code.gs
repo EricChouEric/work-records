@@ -28,6 +28,7 @@ function doGet(e) {
       case 'deleteWorkOrder':  return deleteWorkOrder(e.parameter);
       case 'importWorkOrders': return importWorkOrders(e.parameter);
       case 'importGroups':     return importGroups(e.parameter);
+      case 'deleteGroup':      return deleteGroup(e.parameter);
       case 'testImportSheet':  return testImportSheet(e.parameter);
       case 'importFromSheet':  return importFromSheet(e.parameter);
       case 'getAllReports':    return getAllReports(e.parameter);
@@ -659,6 +660,34 @@ function importGroups(p) {
 
   appendTextRows(targetWs, rowsToAppend, [1, 2]);
   return jsonResponse({ status: 'success', message: `組別匯入完成：新增 ${rowsToAppend.length} 筆，略過重複 ${skipped} 筆` });
+}
+
+function deleteGroup(p) {
+  const userId = validateToken(p.token);
+  if (!userId) return jsonResponse({ status: 'error', message: '登入逾時，請重新登入' });
+  const user = findUser(userId);
+  if (!user || user.role !== 'manager') return jsonResponse({ status: 'error', message: '無權限' });
+
+  const groupName = String(p.group || '').trim();
+  if (!groupName) return jsonResponse({ status: 'error', message: '請指定組別' });
+
+  const users = usersSheet().getDataRange().getDisplayValues();
+  for (let i = 1; i < users.length; i++) {
+    if (String(users[i][4] || '').trim() === groupName) {
+      return jsonResponse({ status: 'error', message: '此組別已有員工使用，無法刪除' });
+    }
+  }
+
+  const ws = groupsSheet();
+  if (!ws) return jsonResponse({ status: 'error', message: '找不到 Groups 分頁' });
+  const data = ws.getDataRange().getDisplayValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0] || '').trim() === groupName) {
+      ws.deleteRow(i + 1);
+      return jsonResponse({ status: 'success', message: '組別已刪除' });
+    }
+  }
+  return jsonResponse({ status: 'error', message: '找不到組別' });
 }
 
 // 預設：分頁名稱 = 船號，A欄（或 p.col 指定欄）= 工單號碼

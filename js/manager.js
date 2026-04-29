@@ -200,18 +200,35 @@ async function loadGroups() {
     wrap.innerHTML = `
       <div class="table-wrap">
         <table>
-          <thead><tr><th>#</th><th>組別</th></tr></thead>
+          <thead><tr><th>#</th><th>組別</th><th></th></tr></thead>
           <tbody>
             ${groups.map((g, i) => `
               <tr>
                 <td style="color:var(--text-muted)">${i + 1}</td>
                 <td><span class="badge badge-green">${escHtml(g)}</span></td>
+                <td><button class="btn btn-sm" style="color:#dc2626;border:1px solid #fecaca;background:#fef2f2"
+                  onclick="deleteGroup('${escAttr(g)}')">刪除</button></td>
               </tr>`).join('')}
           </tbody>
         </table>
       </div>`;
   } catch (e) {
     wrap.innerHTML = '<div class="empty">載入失敗</div>';
+  }
+}
+
+async function deleteGroup(groupName) {
+  if (!confirm(`確定要刪除組別「${groupName}」嗎？`)) return;
+  try {
+    const result = await callAPI({ action: 'deleteGroup', token: session.token, group: groupName });
+    if (result.status === 'success') {
+      await loadGroups();
+      await loadEmployeeFilters();
+    } else {
+      alert(result.message);
+    }
+  } catch (e) {
+    alert('連線失敗');
   }
 }
 
