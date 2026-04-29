@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>管理者儀表板 - 派工系統</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260428-1">
 </head>
 <body>
 
@@ -46,44 +46,18 @@
       <!-- 從 Google Sheet 匯入 -->
       <div class="card">
         <div class="card-title">從 Google Sheet 匯入工單</div>
-        <p class="helper-text">預設使用測試檔格式：同一張表內 E 欄船號、F 欄工單、G 欄工單內容、H 欄預估工時。若要改用分頁名稱當船號，清空船號欄即可。</p>
-        <div class="import-example">
-          <span>test_numeric_ship_employee_ids.xlsx 上傳轉成 Google Sheet 後，直接貼網址即可；系統會讀取表內船號欄。</span>
-        </div>
+        <p class="helper-text">不可使用 xlsx、csv，請使用 Google Sheet。</p>
         <div class="form-group" style="margin-top:.75rem">
           <label>Google Sheet 網址</label>
           <input type="text" id="importSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
         </div>
-        <div class="form-row" style="grid-template-columns:repeat(3,1fr);gap:.75rem">
-          <div class="form-group">
-            <label>指定分頁（留空=全部分頁）</label>
-            <input type="text" id="importSheetName" placeholder="留空讀取全部分頁">
-          </div>
-          <div class="form-group">
-            <label>起始列</label>
-            <input type="number" id="importStartRow" value="2" min="1">
-          </div>
-          <div class="form-group">
-            <label>船號欄</label>
-            <input type="number" id="importShipCol" value="5" min="1">
-          </div>
-          <div class="form-group">
-            <label>工單號碼欄（欄位編號）</label>
-            <input type="number" id="importCol" value="6" min="1">
-          </div>
-          <div class="form-group">
-            <label>工單內容欄</label>
-            <input type="number" id="importContentCol" value="7" min="1">
-          </div>
-          <div class="form-group">
-            <label>預估工時欄</label>
-            <input type="number" id="importEstimateCol" value="8" min="1">
-          </div>
-          <div class="form-group">
-            <label>備註欄（留空=無）</label>
-            <input type="number" id="importRemarkCol" placeholder="例：2" min="1">
-          </div>
-        </div>
+        <input type="hidden" id="importSheetName" value="">
+        <input type="hidden" id="importStartRow" value="2">
+        <input type="hidden" id="importShipCol" value="5">
+        <input type="hidden" id="importCol" value="6">
+        <input type="hidden" id="importContentCol" value="7">
+        <input type="hidden" id="importEstimateCol" value="8">
+        <input type="hidden" id="importRemarkCol" value="">
         <button class="btn btn-primary btn-sm" onclick="importFromSheet()">從 Google Sheet 匯入</button>
         <div id="importMsg" class="msg hidden" style="margin-top:.75rem"></div>
       </div>
@@ -100,21 +74,13 @@
     <div id="groupPanel" class="tab-panel hidden">
       <div class="card">
         <div class="card-title">從 Google Sheet 匯入組別</div>
-        <p class="helper-text"><strong>A 欄</strong>填組別名稱（第 2 列起）。匯入後員工註冊只能從清單選擇組別。</p>
+        <p class="helper-text">不可使用 xlsx、csv，請使用 Google Sheet。</p>
         <div class="form-group" style="margin-top:.75rem">
           <label>Google Sheet 網址</label>
           <input type="text" id="importGroupSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
         </div>
-        <div class="form-row" style="grid-template-columns:1fr 1fr;gap:.75rem">
-          <div class="form-group">
-            <label>指定分頁（留空=全部分頁）</label>
-            <input type="text" id="importGroupSheetName" placeholder="例：組別清單">
-          </div>
-          <div class="form-group">
-            <label>組別欄（欄位編號）</label>
-            <input type="number" id="importGroupCol" value="1" min="1">
-          </div>
-        </div>
+        <input type="hidden" id="importGroupSheetName" value="">
+        <input type="hidden" id="importGroupCol" value="1">
         <button class="btn btn-primary btn-sm" onclick="importGroupsFromSheet()">匯入組別</button>
         <div id="importGroupMsg" class="msg hidden" style="margin-top:.75rem"></div>
       </div>
@@ -250,15 +216,15 @@
 
       <!-- Timeline -->
       <div class="card">
-        <div class="card-title">時間軸（每日實際工時）</div>
+        <div class="card-title">時間軸（每日工時）</div>
         <div id="statsTimeline"><div class="empty">請點擊統計</div></div>
       </div>
     </div><!-- /statsPanel -->
 
   </div><!-- /main-content -->
 
-  <script src="js/api.js?v=20260423-2"></script>
+  <script src="js/api.js?v=20260429-1"></script>
   <script src="js/auth.js"></script>
-  <script src="js/manager.js?v=20260428-1"></script>
+  <script src="js/manager.js?v=20260429-1"></script>
 </body>
 </html>

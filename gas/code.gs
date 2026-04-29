@@ -644,9 +644,12 @@ function importGroups(p) {
   for (const ws of sheets) {
     const lastRow = ws.getLastRow();
     if (lastRow <= startRow) continue;
-    const data = ws.getRange(1, 1, lastRow, col + 1).getDisplayValues();
-    for (let i = startRow; i < data.length; i++) {
-      const group = String(data[i][col] || '').trim();
+    const data = ws.getRange(1, 1, lastRow, Math.max(col + 1, 8)).getDisplayValues();
+    const detectedGroupCol = findHeaderIndex_(data[0] || [], ['組別', '組別名稱']);
+    const effectiveCol = detectedGroupCol >= 0 ? detectedGroupCol : col;
+    const effectiveStartRow = detectedGroupCol >= 0 ? 1 : startRow;
+    for (let i = effectiveStartRow; i < data.length; i++) {
+      const group = String(data[i][effectiveCol] || '').trim();
       if (!group) continue;
       if (existSet.has(group)) { skipped++; continue; }
       rowsToAppend.push([sheetText(group), now]);
