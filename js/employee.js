@@ -115,7 +115,7 @@ function renderCheckboxes(orders) {
     return;
   }
   wrap.innerHTML = orders.map(wo => {
-    const details = [wo.content, wo.estimatedHours ? `預估 ${wo.estimatedHours}` : '', wo.remark]
+    const details = [wo.content, wo.remark]
       .filter(Boolean)
       .join(' / ');
     const label = details ? `${escHtml(wo.id)}（${escHtml(details)}）` : escHtml(wo.id);

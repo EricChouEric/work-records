@@ -19,7 +19,7 @@ async function init() {
 }
 
 function setupNumericInputNormalizers() {
-  ['newWoId', 'newWoShip', 'rShipNo'].forEach(id => {
+  ['newWoId', 'newWoShip'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('blur', () => {
       el.value = normalizeNumericInputValue(el.value);
@@ -153,7 +153,7 @@ async function importFromSheet() {
 
   try {
     const version = await callAPI({ action: 'getVersion' });
-    if (version.status !== 'success' || version.version !== '20260428-no-underscore-v3') {
+    if (version.status !== 'success' || !['20260428-no-underscore-v3', '20260429-delete-group-v4'].includes(version.version)) {
       showMsg(msgEl, 'error', 'GAS Web App 尚未更新到新版匯入程式，請先重新部署 Apps Script。');
       return;
     }
@@ -288,9 +288,14 @@ async function loadEmployeeFilters() {
 }
 
 function refreshWorkOrderFilter() {
-  const sel = document.getElementById('rWorkOrder');
-  while (sel.options.length > 1) sel.remove(1);
-  allWorkOrders.forEach(wo => sel.appendChild(new Option(wo.id, wo.id)));
+  const woSel = document.getElementById('rWorkOrder');
+  while (woSel.options.length > 1) woSel.remove(1);
+  allWorkOrders.forEach(wo => woSel.appendChild(new Option(wo.id, wo.id)));
+
+  const shipSel = document.getElementById('rShipNo');
+  while (shipSel.options.length > 1) shipSel.remove(1);
+  const ships = Array.from(new Set(allWorkOrders.map(wo => wo.shipNo).filter(Boolean))).sort();
+  ships.forEach(shipNo => shipSel.appendChild(new Option(shipNo, shipNo)));
 }
 
 async function loadRecords() {
@@ -310,11 +315,10 @@ async function loadRecords() {
     group:     document.getElementById('rGroup').value      || undefined,
     empId:     document.getElementById('rEmpId').value      || undefined,
     workOrder: document.getElementById('rWorkOrder').value  || undefined,
-    shipNo:    normalizeNumericInputValue(document.getElementById('rShipNo').value) || undefined,
+    shipNo:    document.getElementById('rShipNo').value || undefined,
     reportType: document.getElementById('rReportType').value || undefined,
     sortBy:    document.getElementById('rSortBy').value
   };
-  document.getElementById('rShipNo').value = params.shipNo || '';
 
   try {
     const result = await callAPI(params);

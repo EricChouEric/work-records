@@ -171,6 +171,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+@media (min-width: 768px) {
+  .form-group input[type="date"],
+  .filter-item input[type="date"] {
+    min-height: 56px;
+    padding: .85rem 1rem;
+    font-size: 1.08rem;
+  }
+
+  .form-group input[type="date"]::-webkit-calendar-picker-indicator,
+  .filter-item input[type="date"]::-webkit-calendar-picker-indicator {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+}
+
 /* ── Buttons ─────────────────────────────────── */
 
 .btn {

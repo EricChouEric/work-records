@@ -397,7 +397,7 @@ function getGroups(p) {
 function getVersion(p) {
   return jsonResponse({
     status: 'success',
-    version: '20260428-no-underscore-v3',
+    version: '20260429-delete-group-v4',
     workOrdersColumns: ['工單號碼', '船號', '工單內容', '預估工時', '建立時間', '備註'],
     reportsColumns: ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號', '實際工時', '類別']
   });
