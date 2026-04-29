@@ -506,6 +506,19 @@ tfoot td {
   cursor: pointer;
 }
 
+.check-item span {
+  flex: 1;
+}
+
+.wo-hours-input {
+  width: 88px;
+  flex: 0 0 88px;
+  padding: .4rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: .875rem;
+}
+
 /* ── Manual work order list ──────────────────── */
 
 .extra-label {
@@ -523,6 +536,10 @@ tfoot td {
 
 .manual-wo-row input {
   flex: 1;
+}
+
+.manual-wo-row .wo-hours-input {
+  flex: 0 0 88px;
 }
 
 .btn-remove {

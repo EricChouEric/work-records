@@ -123,8 +123,18 @@ function renderCheckboxes(orders) {
       <label class="check-item">
         <input type="checkbox" class="wo-check" value="${escAttr(wo.id)}">
         <span>${label}</span>
+        <input type="number" class="wo-hours-input" min="0.5" step="0.5" placeholder="工時" disabled>
       </label>`;
   }).join('');
+
+  wrap.querySelectorAll('.wo-check').forEach(check => {
+    check.addEventListener('change', () => {
+      const hoursInput = check.closest('.check-item').querySelector('.wo-hours-input');
+      hoursInput.disabled = !check.checked;
+      if (!check.checked) hoursInput.value = '';
+      if (check.checked) hoursInput.focus();
+    });
+  });
 }
 
 function getSubmitValues() {
@@ -137,19 +147,24 @@ function getSubmitValues() {
     const orders = [...document.querySelectorAll('.manual-wo-input')]
       .map(el => {
         el.value = normalizeNumericInputValue(el.value);
-        return el.value;
-      }).filter(Boolean);
-    return { shipNo, workOrders: orders.join(',') };
+        const row = el.closest('.manual-wo-row');
+        return { id: el.value, hours: Number(row.querySelector('.wo-hours-input').value) };
+      }).filter(item => item.id);
+    return { shipNo, items: orders };
   }
 
   const shipNo  = shipSel.value;
-  const checked = [...document.querySelectorAll('.wo-check:checked')].map(c => c.value);
+  const checked = [...document.querySelectorAll('.wo-check:checked')].map(c => {
+    const row = c.closest('.check-item');
+    return { id: c.value, hours: Number(row.querySelector('.wo-hours-input').value) };
+  });
   const extras  = [...document.querySelectorAll('.extra-wo-input')]
     .map(el => {
       el.value = normalizeNumericInputValue(el.value);
-      return el.value;
-    }).filter(Boolean);
-  return { shipNo, workOrders: [...checked, ...extras].join(',') };
+      const row = el.closest('.manual-wo-row');
+      return { id: el.value, hours: Number(row.querySelector('.wo-hours-input').value) };
+    }).filter(item => item.id);
+  return { shipNo, items: [...checked, ...extras] };
 }
 
 function addManualWoField() {
@@ -157,6 +172,7 @@ function addManualWoField() {
   const row  = document.createElement('div');
   row.className = 'manual-wo-row';
   row.innerHTML = `<input type="text" class="manual-wo-input" placeholder="請輸入工單號碼">
+    <input type="number" class="wo-hours-input" min="0.5" step="0.5" placeholder="工時">
     <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>`;
   list.appendChild(row);
 }
@@ -166,13 +182,14 @@ function addExtraWoField() {
   const row  = document.createElement('div');
   row.className = 'manual-wo-row';
   row.innerHTML = `<input type="text" class="extra-wo-input" placeholder="臨時工單號碼">
+    <input type="number" class="wo-hours-input" min="0.5" step="0.5" placeholder="工時">
     <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>`;
   list.appendChild(row);
 }
 
 function resetManualLists() {
   document.getElementById('manualWoList').innerHTML =
-    '<div class="manual-wo-row"><input type="text" class="manual-wo-input" placeholder="請輸入工單號碼"></div>';
+    '<div class="manual-wo-row"><input type="text" class="manual-wo-input" placeholder="請輸入工單號碼"><input type="number" class="wo-hours-input" min="0.5" step="0.5" placeholder="工時"></div>';
   document.getElementById('extraWoList').innerHTML = '';
 }
 
@@ -181,8 +198,7 @@ async function handleSubmit(e) {
   const btn   = document.getElementById('submitBtn');
   const msgEl = document.getElementById('reportMsg');
 
-  const { shipNo, workOrders } = getSubmitValues();
-  const hours = Number(document.getElementById('hours').value);
+  const { shipNo, items } = getSubmitValues();
   const reportType = document.getElementById('reportType').value;
 
   if (!shipNo) {
@@ -190,14 +206,14 @@ async function handleSubmit(e) {
     msgEl.textContent = '請選擇或輸入船號';
     return;
   }
-  if (!workOrders) {
+  if (!items.length) {
     msgEl.className   = 'msg msg-error';
     msgEl.textContent = '請至少勾選一個工單號碼';
     return;
   }
-  if (!hours || hours <= 0) {
+  if (items.some(item => !item.hours || item.hours <= 0)) {
     msgEl.className   = 'msg msg-error';
-    msgEl.textContent = '請填寫實際工時';
+    msgEl.textContent = '請填寫每個工單的工時';
     return;
   }
 
@@ -211,8 +227,7 @@ async function handleSubmit(e) {
       token:      session.token,
       date:       document.getElementById('date').value,
       shipNo,
-      workOrders,
-      hours,
+      items:      JSON.stringify(items),
       reportType
     });
 

@@ -397,7 +397,7 @@ function getGroups(p) {
 function getVersion(p) {
   return jsonResponse({
     status: 'success',
-    version: '20260429-delete-group-v4',
+    version: '20260429-per-order-hours-v5',
     workOrdersColumns: ['工單號碼', '船號', '工單內容', '預估工時', '建立時間', '備註'],
     reportsColumns: ['提交時間', '施工日期', '工號', '員工姓名', '組別', '工單號碼', '船號', '實際工時', '類別']
   });
@@ -443,21 +443,38 @@ function logout(p) {
 function submitReport(p) {
   const userId = validateToken(p.token);
   if (!userId) return jsonResponse({ status: 'error', message: '登入逾時，請重新登入' });
-  if (!p.date || !p.workOrders || !p.shipNo) return jsonResponse({ status: 'error', message: '請填寫施工日期、工單號碼和船號' });
-  const hours = parseHours(p.hours);
-  if (hours <= 0) return jsonResponse({ status: 'error', message: '請填寫實際工時' });
+  if (!p.date || !p.shipNo) return jsonResponse({ status: 'error', message: '請填寫施工日期和船號' });
   const reportType = normalizeReportType(p.reportType);
 
   const user = findUser(userId);
   if (!user) return jsonResponse({ status: 'error', message: '找不到員工資料' });
 
-  const orders = String(p.workOrders).split(',').map(s => s.trim()).filter(Boolean);
-  if (!orders.length) return jsonResponse({ status: 'error', message: '請至少填入一個工單號碼' });
+  let reportItems = [];
+  if (p.items) {
+    try {
+      const parsed = JSON.parse(p.items);
+      if (Array.isArray(parsed)) {
+        reportItems = parsed.map(item => ({
+          id: normalizeWorkOrderId(item.id),
+          hours: parseHours(item.hours)
+        })).filter(item => item.id);
+      }
+    } catch (e) {
+      return jsonResponse({ status: 'error', message: '工單工時資料格式錯誤' });
+    }
+  } else if (p.workOrders) {
+    const hours = parseHours(p.hours);
+    reportItems = String(p.workOrders).split(',').map(s => s.trim()).filter(Boolean)
+      .map(order => ({ id: normalizeWorkOrderId(order), hours }));
+  }
+
+  if (!reportItems.length) return jsonResponse({ status: 'error', message: '請至少填入一個工單號碼' });
+  if (reportItems.some(item => item.hours <= 0)) return jsonResponse({ status: 'error', message: '請填寫每個工單的工時' });
 
   const sheet = reportsSheet();
   const now   = new Date().toISOString();
   const shipNo = normalizeShipNo(p.shipNo);
-  orders.forEach(order => {
+  reportItems.forEach(item => {
     const row = sheet.getLastRow() + 1;
     setPlainTextValues(sheet, row, 1, [[
       now,
@@ -465,13 +482,13 @@ function submitReport(p) {
       user.id,
       user.name,
       user.group,
-      sheetCodeValue(normalizeWorkOrderId(order)),
+      sheetCodeValue(item.id),
       sheetCodeValue(shipNo),
-      String(hours),
+      String(item.hours),
       reportType
     ]]);
   });
-  return jsonResponse({ status: 'success', message: `報工已儲存（共 ${orders.length} 筆）` });
+  return jsonResponse({ status: 'success', message: `報工已儲存（共 ${reportItems.length} 筆）` });
 }
 
 function getMyReports(p) {
